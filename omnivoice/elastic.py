@@ -167,6 +167,13 @@ def migrate_state_dict(state_dict: dict, num_codebook: int, old_vocab: int) -> d
                     c * old_vocab : (c + 1) * old_vocab
                 ]
             out[key] = new_b
+    # codebook_layer_offsets is a persisted buffer (arange(C) * vocab); if left
+    # at the old vocab stride it silently corrupts every embedding lookup.
+    if "codebook_layer_offsets" in state_dict:
+        old_off = state_dict["codebook_layer_offsets"]
+        out["codebook_layer_offsets"] = (
+            torch.arange(num_codebook, dtype=old_off.dtype) * new_vocab
+        )
     return out
 
 

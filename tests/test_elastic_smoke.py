@@ -79,10 +79,13 @@ def test_migration_preserves_logits():
         "audio_embeddings.weight": torch.randn(C * V, H),
         "audio_heads.weight": torch.randn(C * V, H),
         "audio_heads.bias": torch.randn(C * V),
+        "codebook_layer_offsets": torch.arange(C) * V,
     }
     new = migrate_state_dict({k: v.clone() for k, v in sd.items()}, C, V)
     NV = V + NUM_ELASTIC_CLASSES
     assert new["audio_embeddings.weight"].shape[0] == C * NV
+    # persisted offset buffer must be re-strided to the new vocab
+    assert torch.equal(new["codebook_layer_offsets"], torch.arange(C) * NV)
     h = torch.randn(3, H)
     for c in range(C):
         # embeddings: every original row lands at the remapped index
