@@ -1330,7 +1330,15 @@ class OmniVoice(PreTrainedModel):
         else:
             log_probs = F.log_softmax(c_logits, dim=-1)
 
-        log_probs[..., self.config.audio_mask_id] = -float("inf")
+        if getattr(gen_config, "elastic", False):
+            # Elastic path: the caller manages [expand]/[delete] availability
+            # by pre-masking the logits; only the mask class is banned here.
+            log_probs[..., self.config.audio_mask_id] = -float("inf")
+        else:
+            # Ban mask and any classes beyond it (e.g. elastic specials on a
+            # migrated checkpoint). Byte-identical for official checkpoints,
+            # where mask is the last class.
+            log_probs[..., self.config.audio_mask_id :] = -float("inf")
 
         if gen_config.class_temperature > 0.0:
             filtered_probs = _filter_top_k(log_probs, ratio=0.1)
