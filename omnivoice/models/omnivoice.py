@@ -109,6 +109,12 @@ class OmniVoiceGenerationConfig:
     audio_chunk_threshold: float = 30.0
     pad_duration: float = 0.1
     fade_duration: float = 0.1
+    # Elastic canvas (requires an elastic-migrated checkpoint; see
+    # omnivoice/elastic.py). Off by default: official behaviour unchanged.
+    elastic: bool = False
+    elastic_theta: float = 0.4
+    elastic_lmax_ratio: float = 1.5
+    elastic_max_extra_steps: int = 16
 
     @classmethod
     def from_dict(cls, kwargs_dict):
@@ -389,6 +395,7 @@ class OmniVoice(PreTrainedModel):
         attention_mask: Optional[torch.Tensor] = None,
         document_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        loss_weights: Optional[torch.Tensor] = None,
     ):
 
         inputs_embeds = self._prepare_embed_inputs(input_ids, audio_mask)
@@ -446,6 +453,10 @@ class OmniVoice(PreTrainedModel):
             )
             # valid_mask shape: [Batch, Layer, Seq]
             valid_mask = (labels != -100).float()
+            if loss_weights is not None:
+                # Elastic-canvas per-cell weights (e.g. DreamOn delete
+                # down-weighting). None => byte-identical official loss.
+                valid_mask = valid_mask * loss_weights.float()
 
             # layer_means shape: [num_layers]
             layer_means = (per_token_loss * valid_mask).sum(
@@ -1164,6 +1175,10 @@ class OmniVoice(PreTrainedModel):
             List of generated audio token tensors of shape (C, T) (one per
             input text).
         """
+        if getattr(gen_config, "elastic", False):
+            from omnivoice.elastic import generate_iterative_elastic
+
+            return generate_iterative_elastic(self, task, gen_config)
 
         B = task.batch_size
 

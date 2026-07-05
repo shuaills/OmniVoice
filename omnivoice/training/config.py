@@ -51,6 +51,15 @@ class TrainingConfig:
     instruct_ratio: float = 1.0
     only_instruct_ratio: float = 0.5
 
+    # Elastic canvas (omnivoice/elastic.py). When enabled the checkpoint must
+    # already be migrated to audio_vocab_size = 1027
+    # (scripts/migrate_elastic_ckpt.py).
+    elastic: bool = False
+    p_elastic: float = 0.5
+    elastic_merge_prob: float = 0.08
+    elastic_insert_prob: float = 0.04
+    elastic_end_append_max_ratio: float = 0.25
+
     # Init settings
     resume_from_checkpoint: Optional[str] = None
     init_from_checkpoint: Optional[str] = None

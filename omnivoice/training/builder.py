@@ -142,7 +142,7 @@ def build_dataloaders(
     """
     logger.info("Initializing Data Readers...")
 
-    processor = OmniVoiceSampleProcessor(
+    processor_kwargs = dict(
         text_tokenizer=tokenizer,
         num_channels=config.num_audio_codebook,
         audio_mask_id=config.audio_mask_id,
@@ -154,6 +154,19 @@ def build_dataloaders(
         instruct_ratio=config.instruct_ratio,
         only_instruct_ratio=config.only_instruct_ratio,
     )
+    if getattr(config, "elastic", False):
+        from omnivoice.data.processor import OmniVoiceElasticSampleProcessor
+
+        logger.info("Elastic canvas ENABLED (p_elastic=%s)", config.p_elastic)
+        processor = OmniVoiceElasticSampleProcessor(
+            **processor_kwargs,
+            p_elastic=config.p_elastic,
+            elastic_merge_prob=config.elastic_merge_prob,
+            elastic_insert_prob=config.elastic_insert_prob,
+            elastic_end_append_max_ratio=config.elastic_end_append_max_ratio,
+        )
+    else:
+        processor = OmniVoiceSampleProcessor(**processor_kwargs)
 
     train_manifests, dev_manifests = prepare_data_manifests_from_json(
         config.data_config

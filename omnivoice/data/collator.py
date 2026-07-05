@@ -81,6 +81,19 @@ class PaddingDataCollator:
             )  # [max_len]
             valid[i, :length] = True
 
+        # Optional elastic-canvas loss weights ([C, L] per sample) — padded 0.
+        loss_weights = None
+        if all("loss_weights" in s for s in processed_samples):
+            loss_weights = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        s["loss_weights"], (0, max_len - s["length"]), value=0.0
+                    )
+                    for s in processed_samples
+                ],
+                dim=0,
+            )  # [B, C, max_len]
+
         # Stack into [B, C, max_len] / [B, max_len]
         input_ids = torch.stack(padded_input_ids, dim=0)      # [B, C, max_len]
         labels = torch.stack(padded_labels, dim=0)             # [B, C, max_len]
@@ -91,13 +104,16 @@ class PaddingDataCollator:
         # All query positions attend to all non-padding key positions.
         attention_mask = valid[:, None, None, :].expand(B, 1, max_len, max_len).contiguous()
 
-        return {
+        batch = {
             "input_ids": input_ids,           # [B, C, max_len]
             "labels": labels,                  # [B, C, max_len]
             "audio_mask": audio_mask,          # [B, max_len]
             "position_ids": position_ids,      # [B, max_len]
             "attention_mask": attention_mask,  # [B, 1, max_len, max_len]
         }
+        if loss_weights is not None:
+            batch["loss_weights"] = loss_weights  # [B, C, max_len]
+        return batch
 
 
 class PackingDataCollator:
@@ -148,6 +164,15 @@ class PackingDataCollator:
             "audio_mask": audio_mask.unsqueeze(0),  # [1, L]
             "position_ids": position_ids.unsqueeze(0),  # [1, L]
         }
+
+        if all("loss_weights" in s for s in processed_samples):
+            loss_weights = torch.cat(
+                [s["loss_weights"] for s in processed_samples], dim=1
+            )  # [C, Total_Len]
+            loss_weights = torch.nn.functional.pad(
+                loss_weights, pad=(0, pad_length), value=0.0
+            )
+            return_list["loss_weights"] = loss_weights.unsqueeze(0)  # [1, C, L]
 
         document_ids_list = []
 

@@ -172,6 +172,152 @@ class OmniVoiceSampleProcessor:
         return return_dict
 
 
+class OmniVoiceElasticSampleProcessor(OmniVoiceSampleProcessor):
+    """Elastic-canvas processor: official processing + canvas corruption.
+
+    With probability ``p_elastic`` a sample's audio region is corrupted with
+    [expand]/[delete] supervision (see ``omnivoice.elastic``); otherwise the
+    sample is processed exactly like the official processor, so baseline
+    behaviour is fully recoverable by disabling the special classes.
+
+    Emits an extra ``loss_weights`` tensor ([C, L], float) implementing
+    DreamOn's delete down-weighting; collators pad it with 0.
+    """
+
+    def __init__(
+        self,
+        *args,
+        p_elastic: float = 0.5,
+        elastic_merge_prob: float = 0.08,
+        elastic_insert_prob: float = 0.04,
+        elastic_end_append_max_ratio: float = 0.25,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.p_elastic = p_elastic
+        self.elastic_merge_prob = elastic_merge_prob
+        self.elastic_insert_prob = elastic_insert_prob
+        self.elastic_end_append_max_ratio = elastic_end_append_max_ratio
+
+    def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+        from omnivoice.elastic import corrupt_audio_region
+
+        if random.uniform(0, 1) >= self.p_elastic:
+            out = super().__call__(sample)
+            out["loss_weights"] = (out["labels"] != -100).float()
+            return out
+
+        # Re-implement the official flow with corruption injected between
+        # per-cell masking and concatenation (the audio region is rebuilt, so
+        # we cannot reuse super().__call__ output positions).
+        if "clean_start_token_idx" in sample["label"]:
+            drop_cond = False
+        else:
+            drop_cond = random.uniform(0, 1) < self.drop_cond_ratio
+
+        if drop_cond:
+            prompt_ratio = 0.0
+            drop_text = True
+            use_language = False
+            use_instruct = False
+        else:
+            prompt_ratio = random.uniform(*self.prompt_ratio_range)
+            drop_text = False
+            use_language = random.uniform(0, 1) < self.language_ratio
+            use_instruct = random.uniform(0, 1) < self.instruct_ratio
+            if use_instruct and random.uniform(0, 1) < self.only_instruct_ratio:
+                prompt_ratio = 0.0
+
+        mask_ratio = random.uniform(*self.mask_ratio_range)
+
+        style = ""
+        if use_language:
+            language = sample["label"].get("language_id", "None")
+        else:
+            language = "None"
+        if use_instruct:
+            instruct = sample["label"].get("instruct", "None")
+        else:
+            instruct = "None"
+        if "clean_start_token_idx" in sample["label"]:
+            style += "<|denoise|>"
+        style += f"<|lang_start|>{language}<|lang_end|>"
+        style += f"<|instruct_start|>{instruct}<|instruct_end|>"
+
+        style_inputs = self.text_tokenizer(style, return_tensors="pt").input_ids.repeat(
+            self.num_channels, 1
+        )
+        style_labels = torch.full(style_inputs.shape, -100)
+
+        if (
+            "text_pinyin" in sample["label"]
+            and random.uniform(0, 1) < self.use_pinyin_ratio
+        ):
+            text = sample["label"]["text_pinyin"]
+        else:
+            text = sample["label"]["text"]
+        text_inputs = self.text_tokenizer(
+            f"<|text_start|>{text}<|text_end|>", return_tensors="pt"
+        ).input_ids.repeat(self.num_channels, 1)
+        text_labels = torch.full(text_inputs.shape, -100)
+
+        audio_tokens = sample["audio_tokens"].long()
+        if "clean_start_token_idx" in sample["label"]:
+            prompt_length = sample["label"]["clean_start_token_idx"]
+        else:
+            prompt_length = int(audio_tokens.shape[1] * prompt_ratio)
+
+        audio_inputs = audio_tokens.clone()
+        audio_labels = audio_tokens.clone()
+        maskable_region = audio_tokens[:, prompt_length:]
+        token_mask = torch.rand(maskable_region.shape) < mask_ratio
+        audio_inputs[:, prompt_length:][token_mask] = self.audio_mask_id
+        audio_labels[:, prompt_length:][~token_mask] = -100
+        if not drop_cond:
+            audio_labels[:, :prompt_length] = -100
+
+        audio_inputs, audio_labels, audio_weights = corrupt_audio_region(
+            audio_inputs,
+            audio_labels,
+            prompt_length,
+            self.audio_mask_id,
+            merge_prob=self.elastic_merge_prob,
+            insert_prob=self.elastic_insert_prob,
+            end_append_max_ratio=self.elastic_end_append_max_ratio,
+        )
+        audio_weights = audio_weights * (audio_labels != -100).float()
+
+        if drop_text:
+            input_ids = audio_inputs
+            labels = audio_labels
+            loss_weights = audio_weights
+            total_length = input_ids.shape[1]
+            audio_mask = torch.ones(total_length, dtype=torch.bool)
+        else:
+            input_ids = torch.cat([style_inputs, text_inputs, audio_inputs], dim=1)
+            labels = torch.cat([style_labels, text_labels, audio_labels], dim=1)
+            loss_weights = torch.cat(
+                [
+                    torch.zeros(style_labels.shape, dtype=torch.float32),
+                    torch.zeros(text_labels.shape, dtype=torch.float32),
+                    audio_weights,
+                ],
+                dim=1,
+            )
+            total_length = input_ids.shape[1]
+            audio_start_idx = style_inputs.shape[1] + text_inputs.shape[1]
+            audio_mask = torch.zeros(total_length, dtype=torch.bool)
+            audio_mask[audio_start_idx:] = True
+
+        return {
+            "input_ids": input_ids,
+            "labels": labels,
+            "loss_weights": loss_weights,
+            "audio_mask": audio_mask,
+            "length": total_length,
+        }
+
+
 class OmniVoiceSimpleSampleProcessor:
     """
     Handles the logic of processing a raw sample into tensors
