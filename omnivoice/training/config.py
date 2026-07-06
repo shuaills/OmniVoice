@@ -67,6 +67,14 @@ class TrainingConfig:
     elastic_mid_insert_frac: float = 0.3
     elastic_scheduler_mix: float = 0.5
 
+    # Block-diffusion conversion (design/block-conversion-20260706).
+    # block_training selects OmniVoiceBlockSampleProcessor: one current
+    # block per sample, canvas truncated at its right edge, EOS fill on the
+    # content tail. Checkpoint must be migrated to audio_vocab_size = 1026
+    # (scripts/migrate_block_ckpt.py). Mutually exclusive with elastic.
+    block_training: bool = False
+    block_size: int = 32
+
     # Init settings
     resume_from_checkpoint: Optional[str] = None
     init_from_checkpoint: Optional[str] = None

@@ -154,7 +154,17 @@ def build_dataloaders(
         instruct_ratio=config.instruct_ratio,
         only_instruct_ratio=config.only_instruct_ratio,
     )
-    if getattr(config, "elastic", False):
+    if getattr(config, "block_training", False):
+        if getattr(config, "elastic", False):
+            raise ValueError("block_training and elastic are mutually exclusive")
+        from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor
+
+        logger.info("Block-diffusion training ENABLED (block_size=%s)", config.block_size)
+        processor = OmniVoiceBlockSampleProcessor(
+            **processor_kwargs,
+            block_size=config.block_size,
+        )
+    elif getattr(config, "elastic", False):
         from omnivoice.data.processor import OmniVoiceElasticSampleProcessor
 
         logger.info("Elastic canvas ENABLED (p_elastic=%s, mode=%s)", config.p_elastic, config.elastic_mode)

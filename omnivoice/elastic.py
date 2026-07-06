@@ -230,13 +230,20 @@ def corrupt_audio_region_targeted(
 # ---------------------------------------------------------------------------
 
 
-def migrate_state_dict(state_dict: dict, num_codebook: int, old_vocab: int) -> dict:
-    """Grow the fused audio embedding/head tables from old_vocab to old_vocab+2
-    per codebook, preserving the block layout ``row = c * vocab + v``.
+def migrate_state_dict(
+    state_dict: dict,
+    num_codebook: int,
+    old_vocab: int,
+    num_new_classes: int = NUM_ELASTIC_CLASSES,
+) -> dict:
+    """Grow the fused audio embedding/head tables from old_vocab to
+    old_vocab + num_new_classes per codebook, preserving the block layout
+    ``row = c * vocab + v``. Elastic adds 2 classes ([expand]/[delete]);
+    the block-diffusion conversion adds 1 ([eos]).
 
     New rows are initialised from the mean/std of each codebook's existing rows.
     """
-    new_vocab = old_vocab + NUM_ELASTIC_CLASSES
+    new_vocab = old_vocab + num_new_classes
     out = dict(state_dict)
     for key in ("audio_embeddings.weight", "audio_heads.weight"):
         if key not in state_dict:
@@ -251,7 +258,7 @@ def migrate_state_dict(state_dict: dict, num_codebook: int, old_vocab: int) -> d
             new_w[c * new_vocab : c * new_vocab + old_vocab] = block
             init = block.float()
             new_rows = torch.randn(
-                (NUM_ELASTIC_CLASSES,) + tuple(w.shape[1:]), dtype=torch.float32
+                (num_new_classes,) + tuple(w.shape[1:]), dtype=torch.float32
             ) * init.std().item() + init.mean().item()
             new_w[c * new_vocab + old_vocab : (c + 1) * new_vocab] = new_rows.to(
                 w.dtype
