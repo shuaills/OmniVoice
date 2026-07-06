@@ -157,13 +157,17 @@ def build_dataloaders(
     if getattr(config, "elastic", False):
         from omnivoice.data.processor import OmniVoiceElasticSampleProcessor
 
-        logger.info("Elastic canvas ENABLED (p_elastic=%s)", config.p_elastic)
+        logger.info("Elastic canvas ENABLED (p_elastic=%s, mode=%s)", config.p_elastic, config.elastic_mode)
         processor = OmniVoiceElasticSampleProcessor(
             **processor_kwargs,
             p_elastic=config.p_elastic,
             elastic_merge_prob=config.elastic_merge_prob,
             elastic_insert_prob=config.elastic_insert_prob,
             elastic_end_append_max_ratio=config.elastic_end_append_max_ratio,
+            elastic_mode=config.elastic_mode,
+            elastic_delta_max=config.elastic_delta_max,
+            elastic_mid_insert_frac=config.elastic_mid_insert_frac,
+            elastic_scheduler_mix=config.elastic_scheduler_mix,
         )
     else:
         processor = OmniVoiceSampleProcessor(**processor_kwargs)

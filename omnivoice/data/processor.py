@@ -191,16 +191,26 @@ class OmniVoiceElasticSampleProcessor(OmniVoiceSampleProcessor):
         elastic_merge_prob: float = 0.08,
         elastic_insert_prob: float = 0.04,
         elastic_end_append_max_ratio: float = 0.25,
+        elastic_mode: str = "legacy",
+        elastic_delta_max: float = 0.3,
+        elastic_mid_insert_frac: float = 0.3,
+        elastic_scheduler_mix: float = 0.5,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        if elastic_mode not in ("legacy", "targeted"):
+            raise ValueError(f"elastic_mode must be legacy|targeted, got {elastic_mode}")
         self.p_elastic = p_elastic
         self.elastic_merge_prob = elastic_merge_prob
         self.elastic_insert_prob = elastic_insert_prob
         self.elastic_end_append_max_ratio = elastic_end_append_max_ratio
+        self.elastic_mode = elastic_mode
+        self.elastic_delta_max = elastic_delta_max
+        self.elastic_mid_insert_frac = elastic_mid_insert_frac
+        self.elastic_scheduler_mix = elastic_scheduler_mix
 
     def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
-        from omnivoice.elastic import corrupt_audio_region
+        from omnivoice.elastic import corrupt_audio_region, corrupt_audio_region_targeted
 
         if random.uniform(0, 1) >= self.p_elastic:
             out = super().__call__(sample)
@@ -228,7 +238,14 @@ class OmniVoiceElasticSampleProcessor(OmniVoiceSampleProcessor):
             if use_instruct and random.uniform(0, 1) < self.only_instruct_ratio:
                 prompt_ratio = 0.0
 
-        mask_ratio = random.uniform(*self.mask_ratio_range)
+        # E1.1 dynamic-inverse scheduler (DreamOn 1:1 mix): half the elastic
+        # samples are drawn from the LOW-mask regime so that special targets
+        # coexist with few-mask states — the states iterative inference
+        # actually visits mid-denoise. Static half keeps the official range.
+        if self.elastic_mode == "targeted" and random.uniform(0, 1) < self.elastic_scheduler_mix:
+            mask_ratio = random.uniform(0.0, 0.5)
+        else:
+            mask_ratio = random.uniform(*self.mask_ratio_range)
 
         style = ""
         if use_language:
@@ -276,15 +293,25 @@ class OmniVoiceElasticSampleProcessor(OmniVoiceSampleProcessor):
         if not drop_cond:
             audio_labels[:, :prompt_length] = -100
 
-        audio_inputs, audio_labels, audio_weights = corrupt_audio_region(
-            audio_inputs,
-            audio_labels,
-            prompt_length,
-            self.audio_mask_id,
-            merge_prob=self.elastic_merge_prob,
-            insert_prob=self.elastic_insert_prob,
-            end_append_max_ratio=self.elastic_end_append_max_ratio,
-        )
+        if self.elastic_mode == "targeted":
+            audio_inputs, audio_labels, audio_weights = corrupt_audio_region_targeted(
+                audio_inputs,
+                audio_labels,
+                prompt_length,
+                self.audio_mask_id,
+                delta_max=self.elastic_delta_max,
+                mid_insert_frac=self.elastic_mid_insert_frac,
+            )
+        else:
+            audio_inputs, audio_labels, audio_weights = corrupt_audio_region(
+                audio_inputs,
+                audio_labels,
+                prompt_length,
+                self.audio_mask_id,
+                merge_prob=self.elastic_merge_prob,
+                insert_prob=self.elastic_insert_prob,
+                end_append_max_ratio=self.elastic_end_append_max_ratio,
+            )
         audio_weights = audio_weights * (audio_labels != -100).float()
 
         if drop_text:

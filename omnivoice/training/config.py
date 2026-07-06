@@ -59,6 +59,13 @@ class TrainingConfig:
     elastic_merge_prob: float = 0.08
     elastic_insert_prob: float = 0.04
     elastic_end_append_max_ratio: float = 0.25
+    # E1.1 targeted corruption (elastic_mode="targeted"): per-sample canvas
+    # length error ~ U(-delta_max, +delta_max); scheduler_mix couples half the
+    # elastic samples to the low-mask regime (DreamOn dynamic-inverse analog).
+    elastic_mode: str = "legacy"
+    elastic_delta_max: float = 0.3
+    elastic_mid_insert_frac: float = 0.3
+    elastic_scheduler_mix: float = 0.5
 
     # Init settings
     resume_from_checkpoint: Optional[str] = None
