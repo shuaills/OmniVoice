@@ -315,6 +315,7 @@ def _decode_block_causal(
     num_step_per_block: int = 8,
     use_kv_cache: bool = True,
     logit_trace: Optional[list] = None,
+    seed_audio: Optional[torch.Tensor] = None,
 ):
     """Block-causal decode.  Returns (generated [C, G], stats).
 
@@ -348,6 +349,14 @@ def _decode_block_causal(
     use_cfg = gen_config.guidance_scale != 0 and P > 0
 
     committed = torch.empty((C, 0), dtype=torch.long, device=device)
+    seed_blocks, seed_rem, seed_total = 0, None, 0
+    if seed_audio is not None and seed_audio.size(1) > 0:
+        seed_total = seed_audio.size(1)
+        S = (seed_total // bs) * bs
+        committed = seed_audio[:, :S].to(device).long()
+        seed_blocks = S // bs
+        if seed_total > S:
+            seed_rem = seed_audio[:, S:].to(device).long()
 
     caches = None
     if use_kv_cache:
@@ -360,18 +369,30 @@ def _decode_block_causal(
             _forward_text_prefix(model, prefix, pre_pos, pre_attn, caches["c"])
         if use_cfg:
             caches["u"] = DynamicCache()
+        for sb in range(seed_blocks):
+            blk_t = committed[:, sb * bs:(sb + 1) * bs]
+            Kc = caches["c"].get_seq_length()
+            attn = torch.ones((1, 1, bs, Kc + bs), dtype=torch.bool, device=device)
+            _forward_slices(model, blk_t, P + sb * bs + torch.arange(bs, device=device), attn, caches["c"])
+            if use_cfg:
+                Ku = caches["u"].get_seq_length()
+                attn_u = torch.ones((1, 1, bs, Ku + bs), dtype=torch.bool, device=device)
+                _forward_slices(model, blk_t, sb * bs + torch.arange(bs, device=device), attn_u, caches["u"])
 
     stats = {"n_blocks": 0, "stopped_by_eos": False, "eos_col": None}
 
-    for b in range(max_blocks):
+    for b in range(seed_blocks, max_blocks):
         cur = torch.full((C, bs), mask_id, dtype=torch.long, device=device)
+        if b == seed_blocks and seed_rem is not None:
+            cur[:, : seed_rem.size(1)] = seed_rem
         cur_pos = P + b * bs + torch.arange(bs, device=device)
 
         timesteps = _get_time_steps(
             t_start=0.0, t_end=1.0, num_step=num_step_per_block,
             t_shift=gen_config.t_shift,
         ).tolist()
-        total_mask = bs * C
+        n_pre = seed_rem.size(1) if (b == seed_blocks and seed_rem is not None) else 0
+        total_mask = (bs - n_pre) * C
         rem, sched = total_mask, []
         for step in range(num_step_per_block):
             num = (
@@ -501,7 +522,7 @@ def _decode_block_causal(
             committed = committed[:, :stop_abs]
             break
 
-    return committed, stats
+    return committed[:, seed_total:], stats
 
 
 def _forward_slices_mixed(model, ids, P, positions, attn4d):
