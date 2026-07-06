@@ -74,6 +74,9 @@ class TrainingConfig:
     # (scripts/migrate_block_ckpt.py). Mutually exclusive with elastic.
     block_training: bool = False
     block_size: int = 32
+    # "single" = B1 right-truncation (attention untouched);
+    # "dual"   = B2 two-copy block-causal attention (flex_attention only).
+    block_scheme: str = "single"
 
     # Init settings
     resume_from_checkpoint: Optional[str] = None

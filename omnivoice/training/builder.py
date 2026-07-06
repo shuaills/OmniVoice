@@ -157,13 +157,31 @@ def build_dataloaders(
     if getattr(config, "block_training", False):
         if getattr(config, "elastic", False):
             raise ValueError("block_training and elastic are mutually exclusive")
-        from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor
+        scheme = getattr(config, "block_scheme", "single")
+        if scheme == "dual":
+            if config.attn_implementation != "flex_attention":
+                raise ValueError(
+                    "block_scheme='dual' requires flex_attention (the "
+                    "block-causal mask is built from packed metadata)"
+                )
+            from omnivoice.blockdiff_dual import OmniVoiceBlockDualSampleProcessor
 
-        logger.info("Block-diffusion training ENABLED (block_size=%s)", config.block_size)
-        processor = OmniVoiceBlockSampleProcessor(
-            **processor_kwargs,
-            block_size=config.block_size,
-        )
+            logger.info(
+                "Block-diffusion DUAL (block-causal) training ENABLED "
+                "(block_size=%s)", config.block_size,
+            )
+            processor = OmniVoiceBlockDualSampleProcessor(
+                **processor_kwargs,
+                block_size=config.block_size,
+            )
+        else:
+            from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor
+
+            logger.info("Block-diffusion training ENABLED (block_size=%s)", config.block_size)
+            processor = OmniVoiceBlockSampleProcessor(
+                **processor_kwargs,
+                block_size=config.block_size,
+            )
     elif getattr(config, "elastic", False):
         from omnivoice.data.processor import OmniVoiceElasticSampleProcessor
 

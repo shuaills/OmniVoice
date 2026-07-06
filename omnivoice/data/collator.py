@@ -135,8 +135,14 @@ class PackingDataCollator:
             [s["audio_mask"] for s in processed_samples], dim=0
         )  # [Total_Len]
 
+        # B2 dual-copy samples carry their own position ids (clean and
+        # noisy copies share RoPE positions); official samples fall back to
+        # a per-sample arange, which is what they carried implicitly.
         position_ids = torch.cat(
-            [torch.arange(s["length"], dtype=torch.long) for s in processed_samples],
+            [
+                s.get("position_ids", torch.arange(s["length"], dtype=torch.long))
+                for s in processed_samples
+            ],
             dim=0,
         )  # [Total_Len]
 
@@ -186,5 +192,17 @@ class PackingDataCollator:
             document_ids, pad=(0, pad_length), value=-1
         )
         return_list["document_ids"] = document_ids.unsqueeze(0)  # [1, L]
+
+        if all("copy_tag" in s for s in processed_samples):
+            copy_tags = torch.cat([s["copy_tag"] for s in processed_samples], dim=0)
+            block_ids = torch.cat([s["block_idx"] for s in processed_samples], dim=0)
+            copy_tags = torch.nn.functional.pad(
+                copy_tags, pad=(0, pad_length), value=-1
+            )
+            block_ids = torch.nn.functional.pad(
+                block_ids, pad=(0, pad_length), value=-1
+            )
+            return_list["copy_tags"] = copy_tags.unsqueeze(0)  # [1, L]
+            return_list["block_ids"] = block_ids.unsqueeze(0)  # [1, L]
 
         return return_list

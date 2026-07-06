@@ -396,6 +396,8 @@ class OmniVoice(PreTrainedModel):
         document_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         loss_weights: Optional[torch.Tensor] = None,
+        copy_tags: Optional[torch.Tensor] = None,
+        block_ids: Optional[torch.Tensor] = None,
     ):
 
         inputs_embeds = self._prepare_embed_inputs(input_ids, audio_mask)
@@ -407,10 +409,21 @@ class OmniVoice(PreTrainedModel):
                     "If you do not need flex_attention, set "
                     '"attn_implementation": "sdpa" in your training config.'
                 )
-            attention_mask = create_block_mask(
-                _get_packed_mask(
+            if copy_tags is not None:
+                # B2 block-causal geometry (omnivoice.blockdiff_dual).
+                from omnivoice.blockdiff_dual import get_block_causal_mask_mod
+
+                mask_mod = get_block_causal_mask_mod(
                     document_ids[0].to(inputs_embeds.device),
-                ),
+                    copy_tags[0].to(inputs_embeds.device),
+                    block_ids[0].to(inputs_embeds.device),
+                )
+            else:
+                mask_mod = _get_packed_mask(
+                    document_ids[0].to(inputs_embeds.device),
+                )
+            attention_mask = create_block_mask(
+                mask_mod,
                 B=None,
                 H=None,
                 Q_LEN=input_ids.size(-1),
