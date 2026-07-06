@@ -453,7 +453,11 @@ def generate_blockwise(
         False,
     )
     input_ids = inp["input_ids"]
+    if input_ids.dim() == 3:  # _prepare_inference_inputs returns [1, C, L]
+        input_ids = input_ids[0]
     amask = inp["audio_mask"]
+    if amask.dim() == 2:
+        amask = amask[0]
     audio_cols = int(amask.sum())
     a0 = input_ids.size(1) - audio_cols
     prefix_text = input_ids[:, :a0]
