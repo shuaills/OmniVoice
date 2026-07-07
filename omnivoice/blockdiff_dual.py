@@ -190,8 +190,16 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             lab = seg.clone()
             lab[~token_mask] = -100
             noisy_labels[:, m_lo:hi] = lab
-        # EOS fill: cols >= T are mask on input, [eos] label on cb0 only.
-        noisy_labels[0, T:] = eos
+        # EOS fill: cols >= T are mask on input. [eos] label on cb0 only, and
+        # only on a short window after content end (point-ish event, not a
+        # region): the old full-region fill (labels[0, T:] = eos, ~32 cols/sample)
+        # taught an "end zone" prior over any [content | masked-suffix] block
+        # pattern, which at continuation onset expressed as instant EOS
+        # (30.6% first-block truncation) or, when EOS-banned, a displaced
+        # silence run (the universal onset hum). Verified 2026-07-07:
+        # tests/eos_displacement_test.py (ban=0 -> 3/4 instant EOS).
+        eos_window = 4
+        noisy_labels[0, T:min(T + eos_window, canvas_len)] = eos
 
         if drop_text:
             P = 0

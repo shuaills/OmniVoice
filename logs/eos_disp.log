@@ -1,0 +1,8 @@
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   1%|▏         | 4/313 [00:00<00:33,  9.12it/s]Loading weights:  34%|███▎      | 105/313 [00:00<00:00, 230.82it/s]Loading weights:  47%|████▋     | 148/313 [00:00<00:00, 272.57it/s]Loading weights:  60%|██████    | 189/313 [00:00<00:00, 299.33it/s]Loading weights:  73%|███████▎  | 229/313 [00:00<00:00, 268.31it/s]Loading weights:  84%|████████▍ | 263/313 [00:01<00:00, 284.92it/s]Loading weights:  95%|█████████▍| 297/313 [00:01<00:00, 294.66it/s]Loading weights: 100%|██████████| 313/313 [00:01<00:00, 260.02it/s]
+Loading weights:   0%|          | 0/527 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 175/527 [00:00<00:00, 1562.13it/s]Loading weights:  63%|██████▎   | 332/527 [00:00<00:00, 600.61it/s] Loading weights:  80%|███████▉  | 421/527 [00:00<00:00, 571.31it/s]Loading weights:  94%|█████████▎| 493/527 [00:00<00:00, 541.13it/s]Loading weights: 100%|██████████| 527/527 [00:00<00:00, 584.61it/s]
+=== lead0 vs ban window ===
+10002430-00000015  ban=0: T=0 lead0=0 eos@?  ban=8: T=13 lead0=13 eos@?  ban=30: T=137 lead0=16 eos@?
+10002481-00000105  ban=0: T=9 lead0=0 eos@?  ban=8: T=130 lead0=8 eos@?  ban=30: T=193 lead0=16 eos@?
+10002753-00000006  ban=0: T=160 lead0=0 eos@?  ban=8: T=169 lead0=10 eos@?  ban=30: T=160 lead0=12 eos@?
+10003502-00000044  ban=0: T=0 lead0=0 eos@?  ban=8: T=115 lead0=12 eos@?  ban=30: T=110 lead0=10 eos@?
+EOS_DISP_DONE

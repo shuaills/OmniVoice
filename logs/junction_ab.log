@@ -1,0 +1,15 @@
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   1%|          | 2/313 [00:00<00:57,  5.44it/s]Loading weights:   1%|▏         | 4/313 [00:03<05:16,  1.02s/it]Loading weights:  37%|███▋      | 115/313 [00:03<00:04, 44.59it/s]Loading weights:  52%|█████▏    | 164/313 [00:05<00:04, 36.70it/s]Loading weights:  62%|██████▏   | 195/313 [00:06<00:03, 34.33it/s]Loading weights:  69%|██████▉   | 216/313 [00:07<00:02, 33.41it/s]Loading weights:  74%|███████▍  | 231/313 [00:07<00:02, 35.78it/s]Loading weights:  78%|███████▊  | 243/313 [00:07<00:02, 33.52it/s]Loading weights:  81%|████████  | 252/313 [00:08<00:01, 33.25it/s]Loading weights:  83%|████████▎ | 259/313 [00:08<00:01, 32.06it/s]Loading weights:  85%|████████▍ | 265/313 [00:08<00:01, 31.63it/s]Loading weights:  86%|████████▋ | 270/313 [00:08<00:01, 31.78it/s]Loading weights:  88%|████████▊ | 275/313 [00:08<00:01, 32.61it/s]Loading weights:  89%|████████▉ | 280/313 [00:09<00:01, 32.68it/s]Loading weights:  91%|█████████ | 284/313 [00:09<00:01, 28.11it/s]Loading weights:  92%|█████████▏| 289/313 [00:09<00:00, 28.02it/s]Loading weights:  94%|█████████▎| 293/313 [00:09<00:00, 27.25it/s]Loading weights:  95%|█████████▌| 298/313 [00:09<00:00, 28.80it/s]Loading weights:  97%|█████████▋| 303/313 [00:09<00:00, 30.16it/s]Loading weights:  98%|█████████▊| 307/313 [00:10<00:00, 28.86it/s]Loading weights:  99%|█████████▉| 311/313 [00:10<00:00, 30.95it/s]Loading weights: 100%|██████████| 313/313 [00:10<00:00, 30.53it/s]
+Loading weights:   0%|          | 0/527 [00:00<?, ?it/s]Loading weights:   4%|▍         | 22/527 [00:00<00:02, 218.89it/s]Loading weights:  32%|███▏      | 168/527 [00:00<00:00, 941.17it/s]Loading weights:  50%|████▉     | 262/527 [00:01<00:01, 176.78it/s]Loading weights:  62%|██████▏   | 329/527 [00:01<00:00, 228.60it/s]Loading weights:  74%|███████▎  | 388/527 [00:01<00:00, 190.87it/s]Loading weights:  82%|████████▏ | 430/527 [00:02<00:00, 175.64it/s]Loading weights:  88%|████████▊ | 463/527 [00:02<00:00, 168.73it/s]Loading weights:  93%|█████████▎| 490/527 [00:02<00:00, 165.92it/s]Loading weights:  98%|█████████▊| 514/527 [00:02<00:00, 154.78it/s]Loading weights: 100%|██████████| 527/527 [00:02<00:00, 190.69it/s]
+10002287-00000099 frames=250 lenA=10.00s lenB=10.00s
+10002290-00000102 frames=152 lenA=6.08s lenB=6.08s
+10002309-00000033 frames=140 lenA=5.60s lenB=5.60s
+10002430-00000015 frames=137 lenA=5.48s lenB=5.48s
+10002481-00000105 frames=201 lenA=8.04s lenB=8.04s
+10002750-00000099 frames=121 lenA=4.84s lenB=4.84s
+10002751-00000071 frames=183 lenA=7.32s lenB=7.32s
+10002753-00000006 frames=169 lenA=6.76s lenB=6.76s
+10002287-00000095 frames=253 lenA=10.12s lenB=10.12s
+10002334-00000041 frames=291 lenA=11.64s lenB=11.64s
+10003502-00000044 frames=110 lenA=4.40s lenB=4.40s
+10004424-00000005 frames=165 lenA=6.60s lenB=6.60s
+AB_GEN_DONE

@@ -16,7 +16,7 @@
   "drop_cond_ratio": 0.1,
   "prompt_ratio_range": [
     0.0,
-    0.3
+    0.7
   ],
   "mask_ratio_range": [
     0.0,
