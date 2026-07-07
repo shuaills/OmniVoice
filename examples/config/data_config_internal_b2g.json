@@ -1,0 +1,10 @@
+{
+    "train": [
+        {"language_id": "zh", "manifest_path": ["data/20260622/higgs_tokens_436k/zh_train/data.lst"], "repeat": 1},
+        {"language_id": "en", "manifest_path": ["data/20260622/higgs_tokens_436k/en_train/data.lst"], "repeat": 1}
+    ],
+    "dev": [
+        {"language_id": "zh", "manifest_path": ["data/20260622/higgs_tokens_436k/zh_dev/data.lst"], "repeat": 1},
+        {"language_id": "en", "manifest_path": ["data/20260622/higgs_tokens_436k/en_dev/data.lst"], "repeat": 1}
+    ]
+}
