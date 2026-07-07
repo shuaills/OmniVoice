@@ -45,7 +45,7 @@
   "mixed_precision": "bf16",
   "allow_tf32": true,
   "logging_steps": 100,
-  "eval_steps": 1000,
+  "eval_steps": 1000000000,
   "save_steps": 10000,
   "keep_last_n_checkpoints": 20,
   "block_scheme": "dual",
