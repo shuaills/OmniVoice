@@ -40,7 +40,7 @@ if os.path.isdir(OFFICIAL):
         for post in (False, True):
             out = om.generate(text=ttext, ref_audio=pw, ref_text=ptext,
                               generation_config=OmniVoiceGenerationConfig(postprocess_output=post))
-            wav = out if isinstance(out, np.ndarray) else out
+            wav = out[0] if isinstance(out, (list, tuple)) else out
             ls = lead_sil_sec(wav, int(om.sampling_rate))
             print("%s post=%s 头部低能量=%.2fs 总长=%.2fs" % (utt, post, ls, len(wav)/om.sampling_rate), flush=True)
     del om; torch.cuda.empty_cache()
