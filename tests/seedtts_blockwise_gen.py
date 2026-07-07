@@ -85,7 +85,8 @@ for k, row in enumerate(rows):
         toks, stats = _decode_block_causal(
             model, prefix, gen, block_size=bs, max_blocks=args.max_blocks,
             num_step_per_block=args.steps_per_block, use_kv_cache=True,
-            seed_audio=ref_toks)
+            seed_audio=ref_toks,
+            min_gen_frames=max(8, int(0.3 * model._estimate_target_tokens(ttext, None, None))))
         if toks.size(1) == 0:
             raise RuntimeError('empty generation')
         wav_np = (tok.decode(toks.to(tok.device).unsqueeze(0))

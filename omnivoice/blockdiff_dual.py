@@ -316,6 +316,7 @@ def _decode_block_causal(
     use_kv_cache: bool = True,
     logit_trace: Optional[list] = None,
     seed_audio: Optional[torch.Tensor] = None,
+    min_gen_frames: int = 0,
 ):
     """Block-causal decode.  Returns (generated [C, G], stats).
 
@@ -481,6 +482,15 @@ def _decode_block_causal(
                 else:
                     u_logits = c_logits
 
+            if min_gen_frames > 0:
+                gen_committed = committed.size(1) - seed_blocks * bs
+                jr = torch.arange(bs, device=device)
+                gen_pos = gen_committed + (jr - n_pre)
+                ban_cols = gen_pos < min_gen_frames
+                if ban_cols.any():
+                    c_logits[0, 0, ban_cols, eos] = -float("inf")
+                    if u_logits is not c_logits:
+                        u_logits[0, 0, ban_cols, eos] = -float("inf")
             pred_tokens, scores = _predict_tokens_blockwise(
                 model, c_logits.to(torch.float32), u_logits.to(torch.float32),
                 gen_config,
