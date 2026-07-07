@@ -24,6 +24,7 @@ args = ap.parse_args()
 
 from omnivoice.models.omnivoice import OmniVoice, OmniVoiceGenerationConfig
 from omnivoice.blockdiff_dual import _decode_block_causal
+from omnivoice.utils.text import add_punctuation
 import torchaudio.functional as AF
 
 lang = args.lang or ('zh' if '/zh/' in args.tsv else 'en')
@@ -76,7 +77,10 @@ for k, row in enumerate(rows):
             at = at[0]
         ref_toks = at.squeeze()
         torch.manual_seed(20260707 + k * n + i)
-        inp = model._prepare_inference_inputs(ttext, bs, ptext, ref_toks, lang, None, False)
+        # Official released-pipeline parity: prompt text gets sentence-final
+        # punctuation (preprocess_prompt does this in model.generate); without it
+        # the ptext+ttext concat blurs the sentence boundary at the junction.
+        inp = model._prepare_inference_inputs(ttext, bs, add_punctuation(ptext), ref_toks, lang, None, False)
         ii = inp['input_ids']
         am = inp['audio_mask']
         if ii.dim() == 3:
