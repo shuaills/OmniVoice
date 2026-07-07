@@ -1,0 +1,214 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+		More than one GPU was found, enabling multi-GPU training.
+		If this was unintended please pass in `--num_processes=1`.
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<05:08,  1.00it/s]Loading weights:   0%|          | 1/310 [00:01<08:44,  1.70s/it]Loading weights:  90%|█████████ | 279/310 [00:01<00:00, 346.04it/s]Loading weights:  90%|█████████ | 279/310 [00:01<00:00, 215.28it/s]Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights: 100%|██████████| 310/310 [00:01<00:00, 161.76it/s]
+Loading weights: 100%|██████████| 310/310 [00:01<00:00, 254.59it/s]
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<02:29,  2.07it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 577.32it/s]
+Loading weights:   0%|          | 1/310 [00:00<02:33,  2.01it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 559.58it/s]
+Loading weights:   0%|          | 1/310 [00:00<02:57,  1.74it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 533.85it/s]
+Loading weights:   0%|          | 1/310 [00:00<02:55,  1.76it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 539.49it/s]
+Loading weights:   0%|          | 1/310 [00:00<02:50,  1.81it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 553.35it/s]
+Loading weights:   0%|          | 1/310 [00:00<02:41,  1.91it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 581.35it/s]
+07/07/2026 08:57:51 - INFO - omnivoice.training.trainer - Loaded Config: TrainingConfig(output_dir='exp/block_b2s', data_config='examples/config/data_config_internal_b2g.json', llm_name_or_path='/opt/gpfs/models/Qwen3-0.6B', audio_vocab_size=1026, audio_mask_id=1024, num_audio_codebook=8, audio_codebook_weights=[8, 8, 6, 6, 4, 4, 2, 2], drop_cond_ratio=0.1, prompt_ratio_range=[0.0, 0.3], mask_ratio_range=[0.0, 1.0], language_ratio=0.5, use_pinyin_ratio=0.0, instruct_ratio=0.0, only_instruct_ratio=0.0, elastic=False, p_elastic=0.5, elastic_merge_prob=0.08, elastic_insert_prob=0.04, elastic_end_append_max_ratio=0.25, elastic_mode='legacy', elastic_delta_max=0.3, elastic_mid_insert_frac=0.3, elastic_scheduler_mix=0.5, block_training=True, block_size=32, block_scheme='dual', filter_edge_fillers=True, resume_from_checkpoint=None, init_from_checkpoint=None, learning_rate=0.00021, weight_decay=0.01, max_grad_norm=1.0, steps=500000, seed=42, lr_scheduler_type='cosine', warmup_type='ratio', warmup_ratio=0.03, warmup_steps=0, batch_tokens=20480, gradient_accumulation_steps=1, num_workers=4, mixed_precision='bf16', allow_tf32=True, use_deepspeed=False, deepspeed_config=None, attn_implementation='flex_attention', max_sample_tokens=2000, min_sample_tokens=50, max_batch_size=64, logging_steps=100, eval_steps=1000, save_steps=10000, keep_last_n_checkpoints=20)
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank4]:   File "<frozen runpy>", line 88, in _run_code
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank4]:     main()
+[rank4]:     ~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank4]:     trainer.train()
+[rank4]:     ~~~~~~~~~~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank4]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank4]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank4]:     self.dataset.set_epoch(epoch)
+[rank4]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank4]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank1]:   File "<frozen runpy>", line 88, in _run_code
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank1]:     main()
+[rank1]:     ~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank1]:     trainer.train()
+[rank1]:     ~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank1]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank1]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank1]:     self.dataset.set_epoch(epoch)
+[rank1]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank7]: Traceback (most recent call last):
+[rank7]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank7]:   File "<frozen runpy>", line 88, in _run_code
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank7]:     main()
+[rank7]:     ~~~~^^
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank7]:     trainer.train()
+[rank7]:     ~~~~~~~~~~~~~^^
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank7]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank7]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank7]:     self.dataset.set_epoch(epoch)
+[rank7]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank7]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+07/07/2026 08:57:55 - INFO - omnivoice.training.trainer - Starting Training Loop...
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank2]:   File "<frozen runpy>", line 88, in _run_code
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank2]:     main()
+[rank2]:     ~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank2]:     trainer.train()
+[rank2]:     ~~~~~~~~~~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank2]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank2]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank2]:     self.dataset.set_epoch(epoch)
+[rank2]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank2]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank3]:   File "<frozen runpy>", line 88, in _run_code
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank3]:     main()
+[rank3]:     ~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank3]:     trainer.train()
+[rank3]:     ~~~~~~~~~~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank3]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank3]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank3]:     self.dataset.set_epoch(epoch)
+[rank3]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank3]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank0]:   File "<frozen runpy>", line 88, in _run_code
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank0]:     main()
+[rank0]:     ~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank0]:     trainer.train()
+[rank0]:     ~~~~~~~~~~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank0]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank0]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank0]:     self.dataset.set_epoch(epoch)
+[rank0]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank6]: Traceback (most recent call last):
+[rank6]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank6]:   File "<frozen runpy>", line 88, in _run_code
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank6]:     main()
+[rank6]:     ~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank6]:     trainer.train()
+[rank6]:     ~~~~~~~~~~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank6]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank6]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank6]:     self.dataset.set_epoch(epoch)
+[rank6]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank6]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank5]:   File "<frozen runpy>", line 88, in _run_code
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank5]:     main()
+[rank5]:     ~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank5]:     trainer.train()
+[rank5]:     ~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/training/trainer.py", line 253, in train
+[rank5]:     self.train_dataloader.dataset.set_epoch(self.epoch)
+[rank5]:     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/omnivoice/data/batching.py", line 159, in set_epoch
+[rank5]:     self.dataset.set_epoch(epoch)
+[rank5]:     ^^^^^^^^^^^^^^^^^^^^^^
+[rank5]: AttributeError: 'EdgeFillerFilterDataset' object has no attribute 'set_epoch'
+[rank0]:[W707 08:57:55.575052568 ProcessGroupNCCL.cpp:1538] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W0707 08:57:56.840000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 511 closing signal SIGTERM
+W0707 08:57:56.842000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 512 closing signal SIGTERM
+W0707 08:57:56.844000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 514 closing signal SIGTERM
+W0707 08:57:56.846000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 515 closing signal SIGTERM
+W0707 08:57:56.847000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 516 closing signal SIGTERM
+W0707 08:57:56.849000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 517 closing signal SIGTERM
+W0707 08:57:56.850000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 518 closing signal SIGTERM
+E0707 08:57:57.594000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 2 (pid: 513) of binary: /opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/python
+Traceback (most recent call last):
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/accelerate", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/accelerate_cli.py", line 50, in main
+    args.func(args)
+    ~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1396, in launch_command
+    multi_gpu_launcher(args)
+    ~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1023, in multi_gpu_launcher
+    distrib_run.run(args)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/run.py", line 892, in run
+    elastic_launch(
+    ~~~~~~~~~~~~~~~
+        config=config,
+        ~~~~~~~~~~~~~~
+        entrypoint=cmd,
+        ~~~~~~~~~~~~~~~
+    )(*cmd_args)
+    ~^^^^^^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 143, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 277, in launch_agent
+    raise ChildFailedError(
+    ...<2 lines>...
+    )
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+omnivoice.cli.train FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-07-07_08:57:56
+  host      : shuai-block-b2s-worker-0.shuai-block-b2s.devpod3.svc.cluster.local
+  rank      : 2 (local_rank: 2)
+  exitcode  : 1 (pid: 513)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

@@ -48,6 +48,10 @@ class EdgeFillerFilterDataset:
         self.dataset = dataset
         self.log_every = log_every
 
+    def set_epoch(self, epoch):
+        if hasattr(self.dataset, "set_epoch"):
+            self.dataset.set_epoch(epoch)
+
     def __iter__(self):
         kept = dropped = 0
         for sample in self.dataset:
