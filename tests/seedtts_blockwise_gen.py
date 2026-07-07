@@ -17,6 +17,8 @@ ap.add_argument('--steps-per-block', type=int, default=16)
 ap.add_argument('--max-blocks', type=int, default=24)
 ap.add_argument('--block-size', type=int, default=32)
 ap.add_argument('--limit', type=int, default=0)
+ap.add_argument('--guidance-scale', type=float, default=2.0)
+ap.add_argument('--dtype', default='fp16', choices=['fp16', 'fp32', 'bf16'])
 ap.add_argument('--lang', default=None)
 args = ap.parse_args()
 
@@ -40,12 +42,13 @@ for f in ('audio_tokenizer', 'tokenizer.json', 'tokenizer_config.json', 'chat_te
     src = os.path.abspath(os.path.join(args.base, f))
     if os.path.exists(src) and not os.path.exists(os.path.join(mdir, f)):
         os.symlink(src, os.path.join(mdir, f))
-model = OmniVoice.from_pretrained(mdir, device_map='cuda:0', dtype=torch.float16,
+model = OmniVoice.from_pretrained(mdir, device_map='cuda:0', dtype={'fp16': torch.float16, 'fp32': torch.float32, 'bf16': torch.bfloat16}[args.dtype],
                                   attn_implementation='sdpa')
 model.eval()
 tok = model.audio_tokenizer
 tsr = int(model.sampling_rate)
 gen = OmniVoiceGenerationConfig()
+gen.guidance_scale = args.guidance_scale
 bs = args.block_size
 
 done = skipped = failed = 0

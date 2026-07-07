@@ -17,6 +17,8 @@ pids=()
 for i in $(seq 0 7); do
   CUDA_VISIBLE_DEVICES=$i python tests/seedtts_blockwise_gen.py \
     --tsv "${TSV}" --ckpt "${CKPT}" --base "${BASE}" --out "${OUT}" \
+    --steps-per-block "${STEPS:-16}" --guidance-scale "${GS:-2.0}" --dtype "${DTYPE:-fp16}" \
+    ${LIMIT:+--limit "${LIMIT}"} \
     --shard ${i}/8 >> "logs/eval_$(basename ${OUT})_shard${i}.log" 2>&1 &
   pids+=($!)
 done
