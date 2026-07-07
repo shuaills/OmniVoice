@@ -1,0 +1,5 @@
+Language,SIM-o,WER (%),#samples
+chinese,0.680,3.67,2020
+english,0.631,3.59,1088
+Macro-average,0.655,3.63,-
+Overall,0.663,3.65,3108

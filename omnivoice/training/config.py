@@ -77,6 +77,9 @@ class TrainingConfig:
     # "single" = B1 right-truncation (attention untouched);
     # "dual"   = B2 two-copy block-causal attention (flex_attention only).
     block_scheme: str = "single"
+    # Drop samples whose transcript has an utterance-edge disfluency filler
+    # (zh/ja/ko leading, en leading+trailing). See omnivoice/data/edge_filler_filter.py.
+    filter_edge_fillers: bool = False
 
     # Init settings
     resume_from_checkpoint: Optional[str] = None

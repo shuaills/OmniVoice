@@ -1,0 +1,7 @@
+# seedtts_zh eval report
+
+| Language | SIM-o | WER (%) | #samples |
+| --- | --- | --- | --- |
+| chinese | 0.713 | 3.79 | 304 |
+| Macro-average | 0.713 | 3.79 | - |
+| Overall | 0.713 | 3.79 | 304 |

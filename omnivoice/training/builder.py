@@ -203,7 +203,14 @@ def build_dataloaders(
     train_manifests, dev_manifests = prepare_data_manifests_from_json(
         config.data_config
     )
+
+    filter_edge = getattr(config, "filter_edge_fillers", False)
+    if filter_edge:
+        from omnivoice.data.edge_filler_filter import EdgeFillerFilterDataset
+        logger.info("Edge-filler sample filter ENABLED (zh/ja/ko lead, en lead+trail)")
     raw_train_ds = WebDatasetReader(manifests=train_manifests, evaluation=False)
+    if filter_edge:
+        raw_train_ds = EdgeFillerFilterDataset(raw_train_ds)
 
     use_packing = config.attn_implementation == "flex_attention"
 
@@ -255,6 +262,8 @@ def build_dataloaders(
         raw_dev_ds = WebDatasetReader(
             manifests=dev_manifests, evaluation=True
         )
+        if filter_edge:
+            raw_dev_ds = EdgeFillerFilterDataset(raw_dev_ds)
         if use_packing:
             dev_dataset = PackingIterableDataset(
                 raw_dev_ds, processor, config.batch_tokens

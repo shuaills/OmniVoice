@@ -1,0 +1,7 @@
+# seedtts_en eval report
+
+| Language | SIM-o | WER (%) | #samples |
+| --- | --- | --- | --- |
+| english | 0.641 | 3.68 | 1088 |
+| Macro-average | 0.641 | 3.68 | - |
+| Overall | 0.641 | 3.68 | 1088 |
