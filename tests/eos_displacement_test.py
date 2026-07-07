@@ -8,7 +8,7 @@ from omnivoice.models.omnivoice import OmniVoice, OmniVoiceGenerationConfig
 from omnivoice.blockdiff_dual import _decode_block_causal, block_eos_id
 import tempfile
 SD='/opt/gpfs/users/yinfeng/work/OmniVoice/download/tts_eval_datasets/seedtts_testset/zh'
-CKPT='exp/block_b2/checkpoint-50000'
+CKPT=os.environ.get('CKPT', 'exp/block_b2/checkpoint-50000')
 BASE='/opt/gpfs/users/shuai/work/block-conversion/pretrained_models/OmniVoice-block'
 UTTS=["10002430-00000015","10002481-00000105","10002753-00000006","10003502-00000044"]
 rows={}
