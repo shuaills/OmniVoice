@@ -80,6 +80,9 @@ class TrainingConfig:
     # Drop samples whose transcript has an utterance-edge disfluency filler
     # (zh/ja/ko leading, en leading+trailing). See omnivoice/data/edge_filler_filter.py.
     filter_edge_fillers: bool = False
+    # Probability of snapping the training prompt cut to a sentence boundary
+    # (needs 'turns' in labels; internal dataset has them). See blockdiff_dual.
+    turn_boundary_prompt_prob: float = 0.0
 
     # Init settings
     resume_from_checkpoint: Optional[str] = None

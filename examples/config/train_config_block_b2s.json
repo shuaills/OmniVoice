@@ -50,5 +50,6 @@
   "keep_last_n_checkpoints": 20,
   "block_scheme": "dual",
   "filter_edge_fillers": true,
-  "lr_scheduler_type": "cosine"
+  "lr_scheduler_type": "cosine",
+  "turn_boundary_prompt_prob": 0.5
 }

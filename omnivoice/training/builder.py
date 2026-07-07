@@ -173,6 +173,9 @@ def build_dataloaders(
             processor = OmniVoiceBlockDualSampleProcessor(
                 **processor_kwargs,
                 block_size=config.block_size,
+                turn_boundary_prompt_prob=getattr(
+                    config, "turn_boundary_prompt_prob", 0.0
+                ),
             )
         else:
             from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor

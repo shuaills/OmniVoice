@@ -101,11 +101,20 @@ def build_block_causal_attn_mask(
 class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
     """Official conditioning draws + two-copy block-causal sample layout."""
 
-    def __init__(self, *args, block_size: int = 32, **kwargs):
+    def __init__(self, *args, block_size: int = 32,
+                 turn_boundary_prompt_prob: float = 0.0, **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
             raise ValueError(f"block_size must be positive, got {block_size}")
         self.block_size = block_size
+        # With this probability (and when the label carries per-sentence
+        # 'turns' timestamps), snap the prompt cut to a sentence END instead of
+        # a uniform mid-flow frame. Rationale: inference voice-cloning presents
+        # exactly [complete-sentence audio prefix | more text | continue], a
+        # junction geometry uniform prompt cuts never produce; without it the
+        # model misreads that junction as utterance end (instant EOS / silence
+        # onset, B2F-10k verdict 2026-07-08).
+        self.turn_boundary_prompt_prob = turn_boundary_prompt_prob
 
     def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         # --- official draw order (verbatim; global mask_ratio draw is kept
@@ -165,6 +174,22 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             prompt_length = sample["label"]["clean_start_token_idx"]
         else:
             prompt_length = int(T * prompt_ratio)
+            turns = sample["label"].get("turns")
+            if (
+                turns
+                and prompt_ratio > 0
+                and random.uniform(0, 1) < self.turn_boundary_prompt_prob
+            ):
+                bounds = []
+                for t in turns:
+                    try:
+                        b = int(round((t["start_s"] + t["duration_s"]) * 25))
+                    except (KeyError, TypeError):
+                        continue
+                    if 0.05 * T <= b <= 0.7 * T:
+                        bounds.append(min(b, T))
+                if bounds:
+                    prompt_length = random.choice(bounds)
 
         bs = self.block_size
         n_blocks = T // bs + 1          # trailing block always reaches EOS fill
