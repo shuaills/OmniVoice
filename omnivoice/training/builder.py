@@ -160,6 +160,21 @@ def build_model_and_tokenizer(
 
     if config.perf_torch_compile:
         import torch as _torch
+
+        if config.perf_compile_skip_attn:
+            # Graph-break around attention: flex runs eager (HF singleton),
+            # inductor compiles only the glue. Bisects whether inductor's
+            # flex lowering is the parity-corrupting op.
+            import transformers.integrations.flex_attention as _fa
+            from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS as _AAF
+
+            _disabled = _torch._dynamo.disable(_fa.flex_attention_forward)
+            _fa.flex_attention_forward = _disabled
+            try:
+                _AAF["flex_attention"] = _disabled
+            except Exception:
+                _AAF.register("flex_attention", _disabled)
+            logger.info("PERF: attention excluded from torch.compile scope")
         logger.info(
             "PERF: torch.compile(model.llm, mode=%s, dynamic=%s)",
             config.perf_compile_mode,
