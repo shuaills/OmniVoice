@@ -586,3 +586,23 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   接续 8 条,种子同构);判据:瞬停率显著下降(<2/12)且趋势向零 → v2 有效继续;
   瞬停 ≥3/12 且 10k→15k 平 → v2 入必要不充分堆,点火杠杆 3(显式任务 token/跨句对)。
   B2G 训练本身无论判决如何都继续(数据三角/主表/长文本目标独立于 junction 修复)。
+
+### 2026-07-09 性能战役收官(12 训练臂+8 微基准,全程 parity 门禁)
+- **可采纳组合(唯一既快又对)**:perf_liger+perf_fused_adamw = 3.120 vs 3.240 s/it
+  (-3.7%,parity 0.25%)。低于 5% 线的诚实小赢;flags 在 perf 克隆分支,主树未合
+  (B2G 在跑禁改)。下次发车窗口再决定合入。
+- **大发现①**:torch.compile 在本栈(torch2.8+transformers5.3)全 scope 数值坏:
+  max-autotune 1.245 s/it(**2.6×!**)但 loss 偏 42.6%,三种模式同值=inductor flex
+  lowering 确定性错编译;排除 attention 后仍有第二处 glue 错编译(27.1%)。
+  2.6× 是真实硬件余量;**最高价值下一步=torch 2.9+ 镜像复测**,不是继续调内核。
+- **大发现②(未解 16× 异常=真正成本中心)**:flex backward 训练内 51.5ms/层 vs
+  同 mask/形状/布局隔离 3.3ms。13 个假设全部 A/B 证伪(假设墓地在 PERF_RESULTS.md)。
+  下一探针:真实训练内逐层 CUDA events。解开值 ~2×。
+- 地面真相分解(04x 同步计时):bwd 1.3-2.4s 主导且随 pack 波动,fwd 290ms,
+  optimizer 23ms(profiler 的 322ms 是发射队列噪声→fused AdamW 实测零效应),数据 ~0。
+- P3 rank-balanced packing:科学安全性已代码验证(逐样本 position_ids/same_doc 门控/
+  逐 token loss 权重→跨 rank 重组 loss 恒等),tile-count 成本模型+LPT 设计已写,未实测。
+- P4 TE/fp8:**建议缓测**——16× 异常未解前,TE 移植可能继承同一未知上下文效应,
+  10-15% 门槛的基线不稳。
+- 交付物:block-b2-perf/PERF_RESULTS.md(裁决表+墓地+排序 open items);
+  分支 perf/step-time-20260708(13 commits,8641768…cd19104,全 flag 默认 OFF)。
