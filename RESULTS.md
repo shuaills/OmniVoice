@@ -670,3 +670,7 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   pinyin 路径跳过,循环依赖用函数级 import)。单测 60/60 镜像命中+旗标关闭负对照。
   部署待定:B2H 消融臂需与 B2S 争卡+需先并入 perf 三旗(留待重启合并后 rebase),
   用户晨间拍板。
+- 2026-07-09 t29 复测判决:torch2.9.1 不解禁 compile(maxautotune 2.450 s/it 但 parity
+  仍炸 27.14%)。诊断线索:27.1% 恰等于 2.8 上"排除 attention 后"的腐蚀值 → 2.9 大概率
+  修了 flex lowering(42.6% 分量),但第二处 glue 错编译(融合 embedding/码本头嫌疑)
+  仍在。compile 线正式关闭;eager 三旗(+balanced packing)= 最终推荐不变。
