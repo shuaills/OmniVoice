@@ -87,7 +87,34 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+
+def _blockmask_cache_key(q_len, device_str, *tensors):
+    """Complete content signature of everything the B2 mask_mod closes over.
+
+    _mask_mod_block_causal is a pure function of (document_ids, copy_tags,
+    block_ids); _get_packed_mask of document_ids alone (copy_tags/block_ids
+    are None then, encoded distinctly). Q/KV length and device complete the
+    key. A miss on any content change is mandatory -- a stale hit would be a
+    silent-correctness bug, so the key hashes full tensor bytes, not shapes.
+    """
+    import hashlib
+
+    h = hashlib.sha1()
+    h.update(f"{q_len}|{device_str}".encode())
+    for t in tensors:
+        if t is None:
+            h.update(b"|none")
+        else:
+            h.update(b"|")
+            h.update(
+                t.detach().to("cpu", torch.int64).contiguous().numpy().tobytes()
+            )
+    return h.hexdigest()
+
+
+
 @dataclass
+
 class VoiceClonePrompt:
     ref_audio_tokens: torch.Tensor  # (C, T)
     ref_text: str
@@ -409,28 +436,67 @@ class OmniVoice(PreTrainedModel):
                     "If you do not need flex_attention, set "
                     '"attn_implementation": "sdpa" in your training config.'
                 )
-            if copy_tags is not None:
-                # B2 block-causal geometry (omnivoice.blockdiff_dual).
-                from omnivoice.blockdiff_dual import get_block_causal_mask_mod
+            cache_store = None
+            cache_key = None
+            if getattr(self, "_perf_blockmask_cache", False):
+                cache_store = getattr(self, "_perf_blockmask_store", None)
+                if cache_store is None:
+                    from collections import OrderedDict
 
-                mask_mod = get_block_causal_mask_mod(
-                    document_ids[0].to(inputs_embeds.device),
-                    copy_tags[0].to(inputs_embeds.device),
-                    block_ids[0].to(inputs_embeds.device),
+                    cache_store = OrderedDict()
+                    self._perf_blockmask_store = cache_store
+                    self._perf_blockmask_hits = 0
+                    self._perf_blockmask_misses = 0
+                cache_key = _blockmask_cache_key(
+                    int(input_ids.size(-1)),
+                    str(inputs_embeds.device),
+                    document_ids[0],
+                    copy_tags[0] if copy_tags is not None else None,
+                    block_ids[0] if block_ids is not None else None,
                 )
-            else:
-                mask_mod = _get_packed_mask(
-                    document_ids[0].to(inputs_embeds.device),
+                cached = cache_store.get(cache_key)
+                if cached is not None:
+                    cache_store.move_to_end(cache_key)
+                    self._perf_blockmask_hits += 1
+                    attention_mask = cached
+                else:
+                    self._perf_blockmask_misses += 1
+                total = (
+                    self._perf_blockmask_hits + self._perf_blockmask_misses
                 )
-            attention_mask = create_block_mask(
-                mask_mod,
-                B=None,
-                H=None,
-                Q_LEN=input_ids.size(-1),
-                KV_LEN=input_ids.size(-1),
-                _compile=True,
-                device=inputs_embeds.device,
-            )
+                if total % 100 == 0:
+                    print(
+                        f"[perf] blockmask cache hits={self._perf_blockmask_hits} "
+                        f"misses={self._perf_blockmask_misses}",
+                        flush=True,
+                    )
+            if attention_mask is None:
+                if copy_tags is not None:
+                    # B2 block-causal geometry (omnivoice.blockdiff_dual).
+                    from omnivoice.blockdiff_dual import get_block_causal_mask_mod
+
+                    mask_mod = get_block_causal_mask_mod(
+                        document_ids[0].to(inputs_embeds.device),
+                        copy_tags[0].to(inputs_embeds.device),
+                        block_ids[0].to(inputs_embeds.device),
+                    )
+                else:
+                    mask_mod = _get_packed_mask(
+                        document_ids[0].to(inputs_embeds.device),
+                    )
+                attention_mask = create_block_mask(
+                    mask_mod,
+                    B=None,
+                    H=None,
+                    Q_LEN=input_ids.size(-1),
+                    KV_LEN=input_ids.size(-1),
+                    _compile=True,
+                    device=inputs_embeds.device,
+                )
+                if cache_store is not None:
+                    cache_store[cache_key] = attention_mask
+                    if len(cache_store) > 16:
+                        cache_store.popitem(last=False)
 
         llm_outputs = self.llm(
             inputs_embeds=inputs_embeds,

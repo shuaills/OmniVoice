@@ -115,16 +115,26 @@ def build_model_and_tokenizer(
         hf_logging.set_verbosity(original_level)
         model = OmniVoice(config=ov_config, llm=llm)
 
-    import os as _os
-    if _os.environ.get("PERF_TORCH_COMPILE") == "1":
-        import torch as _torch
-        _mode = _os.environ.get("PERF_COMPILE_MODE", "default")
-        logger.info("PERF: torch.compile(model.llm, mode=%s)", _mode)
-        model.llm = _torch.compile(model.llm, mode=_mode)
-
     # 3. Resize Embeddings
     if len(tokenizer) != model.config.llm_config.vocab_size:
         model.llm.resize_token_embeddings(len(tokenizer))
+
+    # ---- perf experiment hooks (perf/step-time-20260708; default OFF) ----
+    if config.perf_blockmask_cache:
+        model._perf_blockmask_cache = True
+        logger.info("PERF: BlockMask memoization enabled")
+    if config.perf_torch_compile:
+        import torch as _torch
+        logger.info(
+            "PERF: torch.compile(model.llm, mode=%s, dynamic=%s)",
+            config.perf_compile_mode,
+            config.perf_compile_dynamic,
+        )
+        model.llm = _torch.compile(
+            model.llm,
+            mode=config.perf_compile_mode,
+            dynamic=config.perf_compile_dynamic,
+        )
         model.config.llm_config.vocab_size = len(tokenizer)
 
     # 4. Config IDs

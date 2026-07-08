@@ -8,8 +8,9 @@ cd "${REPO}"
 python -c "import omnivoice,sys;p=omnivoice.__file__;print('omnivoice from:',p);sys.exit(0 if p.startswith('${REPO}') else 1)"
 NUM_GPUS="${NUM_GPUS:-4}"
 GPU_IDS="$(seq -s, 0 $((NUM_GPUS-1)))"
+TRAIN_CONFIG="${TRAIN_CONFIG:-examples/config/train_config_perf.json}"
 exec accelerate launch --gpu_ids "${GPU_IDS}" --num_processes "${NUM_GPUS}" \
   -m omnivoice.cli.train \
-  --train_config examples/config/train_config_perf.json \
+  --train_config "${TRAIN_CONFIG}" \
   --data_config examples/config/data_config_internal_b2g.json \
   --output_dir "${OUTPUT_DIR:?}"
