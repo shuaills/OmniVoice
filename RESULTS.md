@@ -548,3 +548,23 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   规格缺陷记录在案(此前模型过首块必说话,故未暴露)。
 - 若 10k 不动 → v2 入"必要不充分"堆,下一杠杆:显式跨句对(ref=第 k 句,
   target=第 k+1 句,双文本真分离)。B2S 已按用户指示重新入队。
+
+### 2026-07-08 性能线 CPU 侧审计收官（fork agent，GPU 实验已预排队）
+- **修正早前判断**：attention 其实已编译——transformers 5.3.0 对 flex_attention 单例
+  torch.compile（dynamic=False），create_block_mask 也走 _compile=True。代码比 450W
+  功耗观感紧得多。trainer 无激活检查点（"关掉试试"命题不存在，69GB 是分配器缓存）。
+- **4-6× 长文档减速 = 固有 tile 数学，非浪费**：flex 跳过全掩码 128×128 tile，可见
+  tile 数 ∝ Σ(doc_len²)（20480 定长画布内）。45s vs 9s 文档 → tile 比 ~4.2×，与实测
+  0.9→4.2 s/it 几乎吻合。**预期优化天花板：温和（胶水融合级）**，不承诺大赢。
+- BlockMask 每步重建（omnivoice.py:425）但闭包三张 [L] 张量逐批变化 → 跨步缓存命中
+  预期 ~0；memoization 臂的价值是给 mask 构建成本上界，profiler 说了算。
+- 陷阱排掉一个：TrainingConfig.from_json 静默丢未知键——新旗标做成真 dataclass 字段，
+  否则 A/B 臂会静默跑成 baseline。
+- 补丁（perf 克隆 perf/step-time-20260708，默认 OFF 惰性）：perf_blockmask_cache
+  （16 条 LRU，键=闭包全张量字节 sha1，带命中率遥测）+ perf_torch_compile（只编
+  model.llm，mask 构建保持 eager 免 graph break）。CPU 单测通过。
+- 预排队（tasks/，pod 一启动自动串行，各 timeout 90m）：01 基线 300 步 / 02 profiler
+  trace / 03 maskcache A/B / 04 compile A/B。采纳规则：≥5% 且无重编译风暴才要。
+- commits：8641768、960af3a（仅本地）。交付物 block-b2-perf/PERF_RESULTS.md。
+- 附注：collator 恒定 padding [1,8,20480] 静态形状 → 若 compile 臂赢，下一步
+  dynamic=False。
