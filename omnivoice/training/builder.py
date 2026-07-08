@@ -127,6 +127,38 @@ def build_model_and_tokenizer(
         model._perf_mask_buffers = True
         logger.info("PERF: persistent mask buffers enabled")
 
+    if config.perf_flex_bf16_qkv:
+        # ROOT-CAUSE FIX (16x anomaly): under accelerate bf16 mixed precision
+        # with fp32 master weights, transformers-5.3 Qwen3 feeds flex
+        # attention FP32 q/k/v (RMSNorm weight-dtype promotion + fp32 rope
+        # constants). fp32 flex backward at head_dim=128 runs ~7x slower.
+        # Cast q/k/v to bf16 at the attention boundary; autograd casts the
+        # grads back to fp32 automatically. Output stays bf16 (o_proj input
+        # under autocast would be bf16 anyway).
+        import transformers.integrations.flex_attention as _fa2
+        from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS as _AAF2
+        import torch as _torch2
+
+        _orig_flex = _fa2.flex_attention_forward
+
+        def _bf16_flex(module, query, key, value, attention_mask, *a2, **kw2):
+            return _orig_flex(
+                module,
+                query.to(_torch2.bfloat16),
+                key.to(_torch2.bfloat16),
+                value.to(_torch2.bfloat16),
+                attention_mask,
+                *a2,
+                **kw2,
+            )
+
+        _fa2.flex_attention_forward = _bf16_flex
+        try:
+            _AAF2["flex_attention"] = _bf16_flex
+        except Exception:
+            _AAF2.register("flex_attention", _bf16_flex)
+        logger.info("PERF: flex q/k/v bf16 cast enabled (fp32-attention fix)")
+
     if config.perf_liger:
         # Requires liger-kernel on PYTHONPATH (perf pylibs dir; NOT installed
         # into the donor venv). rope patches the transformers module globally;
