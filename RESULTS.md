@@ -568,3 +568,7 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 - commits：8641768、960af3a（仅本地）。交付物 block-b2-perf/PERF_RESULTS.md。
 - 附注：collator 恒定 padding [1,8,20480] 静态形状 → 若 compile 臂赢，下一步
   dynamic=False。
+- 2026-07-08 21:0x 沙箱卡点修复：队列仅 gpu3 剩 3 卡（B2S 要整机 8 卡挤不进，不缩——
+  缩了全局 batch 变，B2S vs B2G 同步数可比性破坏）。perf-sandbox 4→3 卡重提交
+  （tasks 脚本 NUM_GPUS 同步改 3，A/B 各臂同为 3 卡仍自可比）→ 秒调度 Running，
+  01 基线已在跑。B2S 继续排队等整机。
