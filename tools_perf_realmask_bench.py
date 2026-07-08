@@ -56,6 +56,27 @@ def bench(label, fn, iters=10):
 
 cf = torch.compile(flex_attention, dynamic=False)
 bench("A real, gqa            ", lambda: cf(q, k, v, block_mask=bm, enable_gqa=True))
+# training-layout variant: projections produce [1, L, H, D] then transpose ->
+# strided views, unlike the contiguous alloc above
+qs = torch.randn(1, L, HQ, D, device=dev, dtype=torch.bfloat16).transpose(1, 2).requires_grad_()
+ks = torch.randn(1, L, HKV, D, device=dev, dtype=torch.bfloat16).transpose(1, 2).requires_grad_()
+vs = torch.randn(1, L, HKV, D, device=dev, dtype=torch.bfloat16).transpose(1, 2).requires_grad_()
+def bench_s(label, fn, iters=10):
+    for _ in range(3):
+        r = fn(); (r[0] if isinstance(r, tuple) else r).sum().backward()
+        qs.grad = ks.grad = vs.grad = None
+    torch.cuda.synchronize(); tf = tb = 0.0
+    for _ in range(iters):
+        torch.cuda.synchronize(); t0 = time.time()
+        r = fn()
+        torch.cuda.synchronize(); tf += time.time() - t0
+        ss = (r[0] if isinstance(r, tuple) else r).sum()
+        torch.cuda.synchronize(); t0 = time.time()
+        ss.backward()
+        torch.cuda.synchronize(); tb += time.time() - t0
+        qs.grad = ks.grad = vs.grad = None
+    print(f"{label}: fwd {tf/iters*1000:7.2f} ms  bwd {tb/iters*1000:7.2f} ms")
+bench_s("S real, strided layout ", lambda: cf(qs, ks, vs, block_mask=bm, enable_gqa=True))
 bench("B real, kv repeated     ", lambda: cf(q, k.repeat_interleave(2, 1), v.repeat_interleave(2, 1), block_mask=bm))
 from transformers.integrations.flex_attention import flex_attention_forward
 class Dummy(torch.nn.Module):
