@@ -2,7 +2,7 @@
 set -euo pipefail
 REPO=/opt/gpfs/users/shuai/work/block-b2-perf/OmniVoice
 source /opt/gpfs/users/shuai/work/block-b2-perf/venv-t29/bin/activate
-export PYTHONPATH="${REPO}"
+export PYTHONPATH="${REPO}${EXTRA_PYTHONPATH:+:${EXTRA_PYTHONPATH}}"
 cd "${REPO}"
 NUM_GPUS="${NUM_GPUS:-3}"
 GPU_IDS="$(seq -s, 0 $((NUM_GPUS-1)))"

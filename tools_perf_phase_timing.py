@@ -4,7 +4,8 @@ import time, torch
 from omnivoice.training.config import TrainingConfig
 from omnivoice.training.builder import build_model_and_tokenizer, build_dataloaders
 
-config = TrainingConfig.from_json("examples/config/train_config_perf.json")
+import sys
+config = TrainingConfig.from_json(sys.argv[1] if len(sys.argv) > 1 else "examples/config/train_config_perf.json")
 config.output_dir = "/tmp/perf_phase_out"
 config.data_config = "examples/config/data_config_internal_b2g.json"
 config.num_workers = 4
@@ -39,3 +40,9 @@ for step in range(12):
     torch.cuda.synchronize(); t_opt = time.time() - t0
     tot = t_data + t_h2d + t_fwd + t_bwd + t_opt
     print(f"{step:>4} {t_data*1000:7.0f} {t_h2d*1000:6.0f} {t_fwd*1000:7.0f} {t_bwd*1000:7.0f} {t_opt*1000:6.0f} {tot*1000:7.0f}")
+
+import time as _t
+t0 = _t.time(); n = 0
+for _ in range(20):
+    _b = next(it); n += 1
+print(f"RAW LOADER: {n} batches in {_t.time()-t0:.2f}s -> {(_t.time()-t0)/n*1000:.0f} ms/batch")
