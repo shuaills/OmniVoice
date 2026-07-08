@@ -2,7 +2,7 @@
 set -euo pipefail
 REPO=/opt/gpfs/users/shuai/work/block-b2-perf/OmniVoice
 source /opt/gpfs/users/yinfeng/work/OmniVoice/.venv/bin/activate
-export PYTHONPATH="${REPO}"
+export PYTHONPATH="${REPO}${EXTRA_PYTHONPATH:+:${EXTRA_PYTHONPATH}}"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 cd "${REPO}"
 python -c "import omnivoice,sys;p=omnivoice.__file__;print('omnivoice from:',p);sys.exit(0 if p.startswith('${REPO}') else 1)"

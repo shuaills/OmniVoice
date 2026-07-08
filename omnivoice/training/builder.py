@@ -123,6 +123,37 @@ def build_model_and_tokenizer(
     if config.perf_blockmask_cache:
         model._perf_blockmask_cache = True
         logger.info("PERF: BlockMask memoization enabled")
+    if config.perf_liger:
+        # Requires liger-kernel on PYTHONPATH (perf pylibs dir; NOT installed
+        # into the donor venv). rope patches the transformers module globally;
+        # rms_norm/swiglu rebind instance forwards.
+        import transformers.models.qwen3.modeling_qwen3 as _mq3
+        from liger_kernel.transformers import apply_liger_kernel_to_qwen3
+
+        apply_liger_kernel_to_qwen3(
+            rope=True,
+            rms_norm=True,
+            swiglu=True,
+            cross_entropy=False,
+            fused_linear_cross_entropy=False,  # tiny 1026 vocab: irrelevant
+            model=model.llm,
+        )
+        _base = getattr(model.llm, model.llm.base_model_prefix, model.llm)
+        _l0 = _base.layers[0]
+        _took = (
+            _mq3.apply_rotary_pos_emb.__module__.startswith("liger_kernel")
+            and _l0.input_layernorm.forward.__func__.__module__.startswith(
+                "liger_kernel"
+            )
+            and _l0.mlp.forward.__func__.__module__.startswith("liger_kernel")
+        )
+        if not _took:
+            raise RuntimeError(
+                "PERF: liger patch did not take (rope/rms/swiglu check "
+                "failed) -- refusing to run a silently-baseline arm"
+            )
+        logger.info("PERF: liger kernels applied (rope+rms_norm+swiglu verified)")
+
     if config.perf_torch_compile:
         import torch as _torch
         logger.info(
