@@ -664,3 +664,9 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 - 决策:B2G 照常续训(数据三角/SIM/长文本目标独立于 junction 修复);B2S 保持 v2
   配方不动(三角可比性);杠杆 3 今夜实现成代码,新消融臂(B2H)排期待用户拍板
   (队列满,需与 B2S 争卡)。
+- 2026-07-09 晨 杠杆 3a 已实现+单测通过(独立克隆 block-b2-lever3,分支
+  fix/junction-lever3-crosssent):句边界吸附触发时,text 通道按推理路径逐字重建
+  _combine_text(ttext, ref_text=add_punctuation(ptext))(join 方式逐样本自校验,
+  pinyin 路径跳过,循环依赖用函数级 import)。单测 60/60 镜像命中+旗标关闭负对照。
+  部署待定:B2H 消融臂需与 B2S 争卡+需先并入 perf 三旗(留待重启合并后 rebase),
+  用户晨间拍板。
