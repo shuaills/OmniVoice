@@ -110,6 +110,7 @@ class TrainingConfig:
     perf_blockmask_cache: bool = False
     perf_liger: bool = False
     perf_fused_adamw: bool = False
+    perf_mask_buffers: bool = False
     perf_torch_compile: bool = False
     perf_compile_mode: str = "default"
     perf_compile_dynamic: bool = True

@@ -60,3 +60,36 @@ print("B traced under autocast       : fwd %7.2f  bwd %7.2f" % measure(cfB, bm_r
 cfC = torch.compile(flex_attention, dynamic=False)
 _ = measure(cfC, bm_degen, iters=2, warm=2)  # poison: first compile/autotune on degenerate mask
 print("C degen-first, then real mask : fwd %7.2f  bwd %7.2f" % measure(cfC, bm_real))
+
+cfD = torch.compile(flex_attention, dynamic=False)
+masks = [mk_mask([1000 + 700 * i, 9000 - 600 * i]) for i in range(10)]
+for i, m in enumerate(masks):
+    _ = measure(cfD, m, iters=1, warm=1)
+import torch._dynamo.utils as du
+print("D dynamo counters after 10 distinct-closure masks:",
+      {k: dict(v) for k, v in du.counters.items() if "recompil" in k or "unimpl" in k} or "none")
+print("D churned wrapper on real mask  : fwd %7.2f  bwd %7.2f" % measure(cfD, bm_real))
+
+# D2: same churn but all masks close over PERSISTENT buffers (the proposed fix)
+bufs = [torch.empty(L, dtype=torch.int32, device=dev) for _ in range(3)]
+def mk_mask_buf(doclens):
+    m = mk_mask(doclens)  # throwaway to get tensors; rebuild via buffers instead
+    return m
+from omnivoice.blockdiff_dual import get_block_causal_mask_mod as gm
+def mask_from_bufs(doclens):
+    doc_ids, tags, blks = [], [], []
+    for d_, dl in enumerate(doclens):
+        p = dl // 10; half = (dl - p) // 2
+        doc_ids += [d_] * (p + 2 * half)
+        tags += [0] * p + [1] * half + [2] * half
+        blks += [0] * p + [i // 32 for i in range(half)] + [i // 32 for i in range(half)]
+    pad = L - len(doc_ids)
+    doc_ids += [-1] * pad; tags += [-1] * pad; blks += [0] * pad
+    for buf, vals in zip(bufs, (doc_ids, tags, blks)):
+        buf.copy_(torch.tensor(vals, dtype=torch.int32))
+    return create_block_mask(gm(*bufs), B=None, H=None, Q_LEN=L, KV_LEN=L, _compile=True, device=dev)
+cfE2 = torch.compile(flex_attention, dynamic=False)
+for i in range(10):
+    _ = measure(cfE2, mask_from_bufs([1000 + 700 * i, 9000 - 600 * i]), iters=1, warm=1)
+bm_real_buf = mask_from_bufs([8622, 10498])
+print("D2 persistent-buffer churn, real: fwd %7.2f  bwd %7.2f" % measure(cfE2, bm_real_buf))

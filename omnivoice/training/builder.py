@@ -123,6 +123,10 @@ def build_model_and_tokenizer(
     if config.perf_blockmask_cache:
         model._perf_blockmask_cache = True
         logger.info("PERF: BlockMask memoization enabled")
+    if config.perf_mask_buffers:
+        model._perf_mask_buffers = True
+        logger.info("PERF: persistent mask buffers enabled")
+
     if config.perf_liger:
         # Requires liger-kernel on PYTHONPATH (perf pylibs dir; NOT installed
         # into the donor venv). rope patches the transformers module globally;

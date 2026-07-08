@@ -475,11 +475,35 @@ class OmniVoice(PreTrainedModel):
                     # B2 block-causal geometry (omnivoice.blockdiff_dual).
                     from omnivoice.blockdiff_dual import get_block_causal_mask_mod
 
-                    mask_mod = get_block_causal_mask_mod(
-                        document_ids[0].to(inputs_embeds.device),
-                        copy_tags[0].to(inputs_embeds.device),
-                        block_ids[0].to(inputs_embeds.device),
-                    )
+                    if getattr(self, "_perf_mask_buffers", False):
+                        # Close the mask_mod over PERSISTENT buffers, refreshed
+                        # in place each step. Fresh per-step closure tensors
+                        # churn torch.compile guards in the flex singleton
+                        # (recompile-limit fallback => degraded kernels); a
+                        # stable closure compiles once and stays correct
+                        # because create_block_mask re-reads buffer VALUES.
+                        bufs = getattr(self, "_perf_mask_bufs", None)
+                        L_cur = document_ids.size(-1)
+                        if bufs is None or bufs[0].numel() != L_cur:
+                            bufs = tuple(
+                                torch.empty(
+                                    L_cur,
+                                    dtype=torch.int32,
+                                    device=inputs_embeds.device,
+                                )
+                                for _ in range(3)
+                            )
+                            self._perf_mask_bufs = bufs
+                        bufs[0].copy_(document_ids[0].to(torch.int32))
+                        bufs[1].copy_(copy_tags[0].to(torch.int32))
+                        bufs[2].copy_(block_ids[0].to(torch.int32))
+                        mask_mod = get_block_causal_mask_mod(*bufs)
+                    else:
+                        mask_mod = get_block_causal_mask_mod(
+                            document_ids[0].to(inputs_embeds.device),
+                            copy_tags[0].to(inputs_embeds.device),
+                            block_ids[0].to(inputs_embeds.device),
+                        )
                 else:
                     mask_mod = _get_packed_mask(
                         document_ids[0].to(inputs_embeds.device),
