@@ -606,3 +606,21 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   10-15% 门槛的基线不稳。
 - 交付物:block-b2-perf/PERF_RESULTS.md(裁决表+墓地+排序 open items);
   分支 perf/step-time-20260708(13 commits,8641768…cd19104,全 flag 默认 OFF)。
+
+### 2026-07-09 DeepSpec(deepseek-ai,2026-07 新库)研读报告(research agent,应用户指令)
+- 库=投机解码 draft 模型训练全栈(DSpark/DFlash/Eagle3),**非内核库**;但 DSpark/DFlash
+  = Qwen3 上的 block-diffusion 式训练 + 数据依赖 mask_mod 闭包 flex BlockMask——
+  **与我们同构**;其栈 torch2.9.1/triton3.5.1/tf5.10,全模型 compile 开着训旗舰 ckpt
+  = **P2(inductor 错编译)是 2.8 时代 bug 的存在性证明**。
+- 实验菜单(按杠杆排序):E1 torch2.9.1 复测(纯环境零代码,解锁 2.6× 最短路径);
+  E2 SpecForge 独立编译 flex 模式(2.8 可用逃生舱:singleton compile flex+create_block_mask,
+  per-shape mask_mod.__name__,recompile_limit 8→64);E3 GQA/layout 微 A/B
+  (repeat_interleave KV vs enable_gqa+contiguous vs 绕开 transformers wrapper——
+  他们两套刻意 workaround=flex GQA 有坑);E4 anchor 采样噪声块(固定 Q 预算→
+  成本恒定+rank 方差结构性消灭;**配方改动=科学线提案**,须独立分支+收敛消融,待拍板)。
+- P1 三条间接线索已转交异常猎手:①flex 模板 ~106KB smem/CTA 低占用对共驻内核极敏感
+  +他们用 no_sync 让 backward 几乎无 NCCL 并发(归因试验:单卡/no_sync/NCCL_MAX_CTAS);
+  ②闭包身份/autotune 缓存碰撞假说(per-shape 重命名+recompile_limit=他们的伤疤代码);
+  ③GQA backward 原子操作/布局假说(E3 即测)。
+- P4/P5 明确无货:无 fp8 attention(仅缓存存储压缩 PR);无 DualPipe 类通信重叠,
+  他们的答案=大梯度累积 no_sync(0.6B DDP 本就不需要)。
