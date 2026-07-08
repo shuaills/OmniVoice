@@ -647,3 +647,10 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   剩余 35k 步 ~41h→~8h。B2S 保排队位,起跑前若已合旗直接带旗;若先起跑则杀重提
   (从头训 500k 预算,5× 是必须)。
 - torch2.9 复测(task15)降级为科学问题(2.8 inductor bug 归档用),非采用依赖。
+- **2026-07-09 溯源判决:fp32 注意力是上游 k2-fsa/OmniVoice 原生 bug**(本地浅克隆
+  3d2bd9d 实证):①上游 forward 默认 flex+create_block_mask(_get_packed_mask)训练,
+  sdpa 仅 fallback;②骨干=transformers Qwen3(AutoModel.from_config),q_norm/k_norm
+  fp32 升格链原生;③上游全部示例配置 mixed_precision=bf16(fp32 master+autocast);
+  ④上游文件零 dtype cast。我们仅加 blockdiff_dual.py+一行 mask_mod 换接——易伤管线
+  全部继承。**含义:官方 580kh 模型训练同付 4-5× 税**;值得上游 issue/PR(边界 cast
+  一行,实测 4.3×),对外发布待用户拍板。
