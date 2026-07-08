@@ -9,7 +9,7 @@ def losses(path):
     out = {}
     for step in range(10, 110, 10):
         last = None
-        for m in re.finditer(r"\b%d/\d+ \[[^]]*\][^\n]*?loss=([0-9.naif]+)" % step, text):
+        for m in re.finditer(r"\b%d/\d+ \[[^\r\n]*?loss=([0-9.naif]+)" % step, text):
             last = m.group(1)
         if last is not None:
             out[step] = last
