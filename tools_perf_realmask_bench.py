@@ -11,7 +11,7 @@ import omnivoice.training.builder as B
 config = TrainingConfig.from_json("examples/config/train_config_perf.json")
 config.output_dir = "/tmp/perf_realmask_out"
 config.data_config = "examples/config/data_config_internal_b2g.json"
-config.num_workers = 0
+config.num_workers = 1
 
 # tokenizer only; skip weight load: build tokenizer via the builder's path
 from transformers import AutoTokenizer
