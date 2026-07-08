@@ -15,6 +15,9 @@ def probed(module, query, key, value, attention_mask, *a, **kw):
         print(f"CALL q={tuple(query.shape)} {query.dtype} contig={query.is_contiguous()} "
               f"k={key.dtype} v={value.dtype} "
               f"mask={type(bm).__name__} sparsity={bm.sparsity():.1f}%", flush=True)
+        print(f"  autocast_enabled={torch.is_autocast_enabled('cuda')} "
+              f"vproj_w={module.v_proj.weight.dtype} "
+              f"qnorm_w={module.q_norm.weight.dtype}", flush=True)
         print(f"  scaling_arg={a[:1] if a else None} kwargs_keys={sorted(kw.keys())}", flush=True)
     return _orig(module, query, key, value, attention_mask, *a, **kw)
 
