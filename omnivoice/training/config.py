@@ -113,6 +113,8 @@ class TrainingConfig:
     perf_mask_buffers: bool = False
     perf_compile_skip_attn: bool = False
     perf_flex_bf16_qkv: bool = False
+    # >0 enables cost-balanced packing with this window (in packs).
+    perf_balanced_packing: int = 0
     perf_torch_compile: bool = False
     perf_compile_mode: str = "default"
     perf_compile_dynamic: bool = True

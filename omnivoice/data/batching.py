@@ -146,11 +146,13 @@ class PackingIterableDataset(WrappedIterableDataset):
         dataset: IterableDataReader,
         processor: Any,
         batch_tokens: int,
+        balanced_window: int = 0,
     ):
         self.dataset = dataset
         self.processor = processor
         self.batch_tokens = batch_tokens
         self.skip_batches = 0
+        self.balanced_window = balanced_window
 
     def set_epoch(self, epoch: int):
         """
@@ -158,7 +160,73 @@ class PackingIterableDataset(WrappedIterableDataset):
         """
         self.dataset.set_epoch(epoch)
 
+    @staticmethod
+    def _attn_cost(sample):
+        """Analytic visible-pair proxy for the B2 dual-copy mask: p^2 + 2ph +
+        h^2 + 32h (prefix/clean/noisy visibility). Falls back to length^2."""
+        tag = sample.get("copy_tag")
+        if tag is None:
+            n = sample["length"]
+            return float(n) * n
+        p = float((tag == 0).sum())
+        h = float((tag == 1).sum())
+        return p * p + 2.0 * p * h + h * h + 32.0 * h
+
+    def _iter_balanced(self):
+        """Windowed cost-balanced packing: buffer ~window packs of samples,
+        LPT-assign (largest cost first -> currently cheapest pack with room).
+        Pure sample->pack reassignment; every sample still trains exactly
+        once, so this is equivalent to a shuffle-seed change, not a recipe
+        change. Leftovers carry into the next window."""
+        window_tokens = self.balanced_window * self.batch_tokens
+        buf = []
+        buf_tokens = 0
+
+        def flush(buf, final=False):
+            buf.sort(key=lambda x: -x[0])
+            packs = []   # list of [cost_sum, token_sum, samples]
+            for cost, sample in buf:
+                n = sample["length"]
+                candidates = [pk for pk in packs if pk[1] + n <= self.batch_tokens]
+                if candidates:
+                    pk = min(candidates, key=lambda x: x[0])
+                    pk[0] += cost; pk[1] += n; pk[2].append(sample)
+                else:
+                    packs.append([cost, n, [sample]])
+            packs.sort(key=lambda x: -x[1])
+            carry = []
+            if not final and packs:
+                # retain the least-filled pack as carry-over seed
+                last = packs.pop() if len(packs) > 1 else None
+                if last is not None:
+                    carry = [(self._attn_cost(sm), sm) for sm in last[2]]
+            for pk in packs:
+                yield pk[2]
+            self._carry = carry
+
+        self._carry = []
+        for raw_sample in self.dataset:
+            try:
+                processed = self.processor(raw_sample)
+            except Exception as e:
+                logging.warning(f"Error processing sample {raw_sample}: {e}")
+                continue
+            n = processed["length"]
+            if n > self.batch_tokens:
+                continue
+            buf.append((self._attn_cost(processed), processed))
+            buf_tokens += n
+            if buf_tokens >= window_tokens:
+                yield from flush(buf)
+                buf = list(self._carry); self._carry = []
+                buf_tokens = sum(x[1]["length"] for x in buf)
+        if buf:
+            yield from flush(buf, final=True)
+
     def __iter__(self) -> Iterator[List[Dict[str, Any]]]:
+        if self.balanced_window and self.balanced_window > 0:
+            yield from self._iter_balanced()
+            return
         current_batch = []
         current_token_count = 0
 

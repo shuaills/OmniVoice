@@ -319,6 +319,8 @@ def build_dataloaders(
     if use_packing:
         train_dataset = PackingIterableDataset(
             raw_train_ds, processor, config.batch_tokens
+        ,
+            balanced_window=getattr(config, 'perf_balanced_packing', 0),
         )
         collate_fn = PackingDataCollator(processor, config.batch_tokens)
     else:
