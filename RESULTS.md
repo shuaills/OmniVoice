@@ -624,3 +624,26 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   ③GQA backward 原子操作/布局假说(E3 即测)。
 - P4/P5 明确无货:无 fp8 attention(仅缓存存储压缩 PR);无 DualPipe 类通信重叠,
   他们的答案=大梯度累积 no_sync(0.6B DDP 本就不需要)。
+
+### 2026-07-09 凌晨 性能线破案大捷:16× 异常 = 注意力一直在跑 FP32(全战役所有训练中招)
+- **根因链**:accelerate bf16 混精保 fp32 master weights → transformers5.3 Qwen3RMSNorm
+  `weight(fp32) × hidden(bf16)` 静默升格 q/k(fp32 RoPE 常量连带 v)→ flex_attention
+  以 fp32 跑 head_dim=128,backward 模板寄存器压力灾难:**61.8ms vs bf16 5.1ms = 12×
+  纯 dtype 差**(同 mask/形状/布局)。
+- 破案法(判决性):节点级 CUDA-event 窗 ≈ CUPTI 内核时长(36.6 vs 36.45ms)= 内核
+  真慢非 stall;28 层均匀;随 pack 36-76ms 波动。此前"隔离基准快"= 基准双重错形状
+  (bf16+D64,真实 fp32+D128)的伪影。最小复现器 tools_perf_fp32_bench.py。
+- DeepSpec 三线索处置:NCCL 共驻✗(单卡全量复现)、recompile 回退✗(TORCH_LOGS 零行)、
+  GQA/布局✗(fp32 下 repeat_interleave/contiguous 无动)。
+- **修复+验证(3×H100,300 步,parity 门禁)**:perf_flex_bf16_qkv 单旗 3.240→0.755 s/it
+  (4.3×,parity 0.43%);**终局三旗组合(+liger+fused_adamw)= 0.610 s/it(5.3×,
+  parity 0.46%)**。机理:flex 边界 cast q/k/v→bf16(梯度自动回 cast,softmax 累加
+  仍 fp32)= 混精本来就该对每个 matmul 做的事。compile 2.6× 之谜同时解开:inductor
+  赢的大头=顺手修了 fp32 病;eager 修复 0.610 已反超(数值坏的)compile 1.245。
+- **跨战役含义:本栈所有 OmniVoice 训练(B1/B2/B2F/B2G/弹性各线)一直 fp32 注意力**;
+  8 卡主跑预期同量级倍数。
+- **决策(Plan C,保判决完整性)**:B2G 先跑完 15k 探针(v2 判决 5k/10k/15k 全程
+  fp32 注意力=单变量干净),判决落地后停车→合三旗入主树→ckpt-15000 续跑;
+  剩余 35k 步 ~41h→~8h。B2S 保排队位,起跑前若已合旗直接带旗;若先起跑则杀重提
+  (从头训 500k 预算,5× 是必须)。
+- torch2.9 复测(task15)降级为科学问题(2.8 inductor bug 归档用),非采用依赖。
