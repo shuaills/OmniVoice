@@ -680,7 +680,7 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 **Plan C (perf flags on production) verified green:**
 - B2G resumed from `exp/block_b2g/checkpoint-20000` (explicit log line; old run archived at step 20098, ~98 steps discarded by design).
 - Flags live in dumped config for BOTH lanes: `perf_flex_bf16_qkv=True, perf_liger=True, perf_fused_adamw=True`.
-- Step time: 4.05–4.36 s/it (fp32-era archive tail) → **0.60–0.65 s/it** at 8 GPUs = **~6.8× production speedup**. Matches sandbox 0.610 s/it (3×H100) — 8-GPU DDP scaling cost negligible.
+- Step time: full-era medians 4.040 s/it (fp32 era, 20k readings) → **0.625 s/it** (bf16 era, 17.7k readings) = **6.5× production speedup** (tail-vs-tail ~6.8×). Matches sandbox 0.610 s/it (3×H100) — 8-GPU DDP scaling cost negligible.
 - Loss continuity across the boundary: 4.41/4.52 (steps 20097–98, pre) → 4.04/4.75 (20001–02, post) → 4.20–4.57 at 37k. Same band; 17k steps of healthy training on bf16 attention = long-horizon validation of the fix.
 - Checkpoints 25k/30k/35k saved post-restart. B2G ETA 50k ≈ 16:10 CST 2026-07-09 (was ~27h at old speed).
 - B2S (from-scratch 500k) Running on the freed node: 7000/500000 @ ~0.62 s/it, loss 5.55 and falling, grad_norm 0.70, lr warmup exactly on schedule (9.8e-5 = 2.1e-4 × 7k/15k). Survived the first-1000-step life-or-death window.
