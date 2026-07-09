@@ -674,3 +674,15 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
   仍炸 27.14%)。诊断线索:27.1% 恰等于 2.8 上"排除 attention 后"的腐蚀值 → 2.9 大概率
   修了 flex lowering(42.6% 分量),但第二处 glue 错编译(融合 embedding/码本头嫌疑)
   仍在。compile 线正式关闭;eager 三旗(+balanced packing)= 最终推荐不变。
+
+## 2026-07-09 — Plan C restart VERIFIED (6.8× at 8 GPUs) + upstream PR #212 submitted
+
+**Plan C (perf flags on production) verified green:**
+- B2G resumed from `exp/block_b2g/checkpoint-20000` (explicit log line; old run archived at step 20098, ~98 steps discarded by design).
+- Flags live in dumped config for BOTH lanes: `perf_flex_bf16_qkv=True, perf_liger=True, perf_fused_adamw=True`.
+- Step time: 4.05–4.36 s/it (fp32-era archive tail) → **0.60–0.65 s/it** at 8 GPUs = **~6.8× production speedup**. Matches sandbox 0.610 s/it (3×H100) — 8-GPU DDP scaling cost negligible.
+- Loss continuity across the boundary: 4.41/4.52 (steps 20097–98, pre) → 4.04/4.75 (20001–02, post) → 4.20–4.57 at 37k. Same band; 17k steps of healthy training on bf16 attention = long-horizon validation of the fix.
+- Checkpoints 25k/30k/35k saved post-restart. B2G ETA 50k ≈ 16:10 CST 2026-07-09 (was ~27h at old speed).
+- B2S (from-scratch 500k) Running on the freed node: 7000/500000 @ ~0.62 s/it, loss 5.55 and falling, grad_norm 0.70, lr warmup exactly on schedule (9.8e-5 = 2.1e-4 × 7k/15k). Survived the first-1000-step life-or-death window.
+
+**Upstream PR submitted: k2-fsa/OmniVoice#212** — AttentionInterface-registered autocast cast for flex q/k/v (the fp32-attention root cause; upstream-native since the founding commit). Smoke-tested on stock transformers 5.13 (CPU repro: fp32 at boundary → bf16 at kernel; no-op without autocast). Corroboration from upstream PR #74 (FA2 inference, open since April, unreviewed): SDPA and FA2 both get cast protection inside transformers — flex is the only unprotected backend, and it is the one training uses. Evidence figures (cross-boundary timeline + kernel comparison) in progress for the PR comment thread.
