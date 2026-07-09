@@ -31,11 +31,12 @@ gen_lang() {
   local out="${RES}/seedtts_${lang}"
   mkdir -p "${out}"
   local pids=() rc=0
-  for i in $(seq 0 7); do
+  NGPU="${NGPU:-8}"
+  for i in $(seq 0 $((NGPU-1))); do
     CUDA_VISIBLE_DEVICES=$i python tests/seedtts_blockwise_gen.py \
       --tsv "${tsv}" --ckpt "${CKPT}" --base "${BASE}" --out "${out}" \
       --steps-per-block 16 --guidance-scale 2.0 --dtype fp16 \
-      --shard ${i}/8 >> "logs/b2g50k_gen_${lang}_shard${i}.log" 2>&1 &
+      --shard ${i}/${NGPU} >> "logs/b2g50k_gen_${lang}_shard${i}.log" 2>&1 &
     pids+=($!)
   done
   for p in "${pids[@]}"; do wait "$p" || rc=1; done
