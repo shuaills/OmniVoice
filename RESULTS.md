@@ -829,3 +829,18 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 - **机制修订**：哼鸣≠EOS 位移渲染、≠CFG 特殊类外推（该嫌疑退休）、≠argmax 平局塌缩（Codex 方向对但机制是 NaN 中毒非平坦分布）。EOS 解耦训练设计（DESIGN c58cf6f）从"哼鸣根修"降级为"**真实残余问题的根修**"：① 转换携带 junction EOS 引力（2/12）② en floor 系数 ③ 尾部残差（需修后重听验证）。优先级重排后再拍板排卡。
 
 **夜间三 bug 总账**：fp32 注意力（训练 6.5×）→ seed_rem 计数（headline 回收 zh 3.83）→ **CFG NaN（哼鸣清零、WER-100 0.23%）**。三者叠加曾把一个大体健康的转换模型演成重病号。
+
+## 2026-07-10 凌晨 III — B2S 干净仪器重测 + 主树合入验证（通宵战役收官）
+
+**① B2S-30k NaN 修复版 first-100 重测**（shim ckpt，修复采样器，floor 恒开）：
+| 指标 | 污染值 | 修后 |
+|---|---|---|
+| WER-100 | 20.83% | **16.50%**（= 6% 训练量的真实水平） |
+| ASR 口癖 | 55/100 | **0/100** |
+| 声学哼鸣 | 84/100 | **3/100**（中位 0.016） |
+| gen 卫生 | — | 100/100、EOS 100/100、frames 101/154/232、<64 = 0 |
+**从头模型同样完全无哼** → 三角故事清洁化：B2S 30k 已产出可懂、零口癖语音；此前"从头模型病更重"完全是 NaN 伪影。音频在用户本地 ~/Desktop/b2s_30k_audio/zh_first100_nanfix/。
+
+**② 主树合入（用户拍板"cleanup 一波，进 main"）**：commit **300bf06** = seed_rem 修复（gen_frame_positions helper + jr>=n_pre guard）+ finfo 有限 pre-CFG ban + 5 回归测试（主树跑通）+ DUMP_TOKENS_DIR/PROMPT_FILTER/TAIL_PAD_S 探针工具。清理不进 main：ONSET_BAN（no-op）、SEAM_PUNCT（探针专用）。安全扫描：全库唯一 pre-combine ban 点即此处（blockdiff.py 各 -inf 均为 combine 后，安全）。**GPU 冒烟：主树 6-utt 生成与探针分支 token 逐字节一致 6/6** —— 主树 = 探针分支行为完全等价，已推 ysgit。B2S 训练进程不受影响（模块已加载；重启后 import 新代码训练语义零变化）。
+
+**通宵总账**：三 bug（fp32 注意力 6.5×训练加速 / seed_rem 计数 / CFG NaN）；修后 B2G first-100 WER 0.23%、口癖 0/100、哼鸣 4/100；B2S first-100 WER 16.50%、口癖 0/100、哼鸣 3/100；主表待全集 re-eval 正式化（rescue 拼接 zh 3.83/en 7.06 已是下界）。真实残余问题清单见凌晨 II 条目 ⑤。
