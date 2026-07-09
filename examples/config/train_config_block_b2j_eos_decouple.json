@@ -31,7 +31,7 @@
   "block_size": 32,
   "resume_from_checkpoint": "/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000",
   "init_from_checkpoint": "/opt/gpfs/users/shuai/work/block-conversion-b2/pretrained_models/OmniVoice-block",
-  "learning_rate": 3e-05,
+  "learning_rate": 0.0005,
   "weight_decay": 0.01,
   "max_grad_norm": 1.0,
   "steps": 58000,
