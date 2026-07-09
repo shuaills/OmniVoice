@@ -758,3 +758,19 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 | 末块残差异响 | 常见 | 并行去掩码残差提交 | 时长法证 100/100（vocoder 无罪） |
 
 **下一仗（进行中）**：① 训练数据 turn-onset 声学先验探针——fillerometer 对准 436kh 数据自身的 turn 起始 1.28s（audiobook 换气/停顿在转写上不可见；若数据 onset 先验哼鸣饱和 → 根修 = 数据 onset 卫生/trim-to-speech，AR 世界标准做法；若干净 → 嫌疑回到 EOS 窗/CFG 几何）；② AR-TTS 实践挖掘（EOS 延迟/惩罚调度、min_new_tokens 跨块化——顺修 min_gen_frames 只盖首块的规格缺陷、onset 特殊 token 过滤、ref 音频尾静音规范）；③ 后续因果探针：静音种子实验（用真实数据 onset token 预填首块，测自激级联是否断裂）、哼鸣块 token 法证（与数据 onset token 直方图对照）、B2S 100k/200k 复测（病随训练生长 → EOS 4 列窗仍在教先验）。
+
+## 2026-07-09 深夜 IV — min_gen_frames 计数 bug（Codex 报告，实证+已修）+ 训练数据 onset 先验判决
+
+**① min_gen_frames seed_rem 计数 bug（用户转 Codex 报告；判决：属实，已修+实证）**
+- 病灶 omnivoice/blockdiff_dual.py:518-521：`gen_committed = committed.size(1) − seed_blocks×bs` —— prompt 长度非 32 整倍时，首生成块里的 seed_rem 预填帧在**首块之后**被计成已生成帧 → EOS 地板提前 seed_rem 帧失效（首块内 `jr − n_pre` 是对的，越块后 n_pre=0 而 committed 已含 seed_rem）。
+- 实证链（判决级）：10002430-00000015 +0.15s pad → seed≈116 tok、seed_rem≈20、首块真实生成仅 ~12 帧；观测 ban=30 却 T=14 = EOS 在第 2 块 jr≈2 开火——伪计数 32+2=34 ≥ 30 放行，真实生成 14 < 30 本应禁。**今晚 padding 探针记录在案的 ban 窗异常正是本 bug 的签名。**
+- 修复（Codex 方案，验证正确）：`gen_pos = (committed.size(1) − seed_total) + jr`；整倍 seed / 无 seed 时与旧逻辑退化等价；首块预填列 gen_pos 为负被 ban 无害（本就非 mask 列，不可重提交）。perf 克隆探针分支 commit **4bf82df**。
+- 修后同 cell A/B：ban=0 **T=162 逐字节复现**（地板关闭时 no-op ✓）、ban=8 T=14 复现（正确计数下本就合法 ✓）、**ban=30 T=14 → T=201**（地板首次真正生效；lead0=48 = 位移而非治愈，与 EOS 位移机理一致）。
+- 影响面：ban=0 的全部诊断读数无损；生产三重护栏中的地板在几乎所有真实 prompt（非整块对齐）下被削弱，期望少 ~16 帧。**主树应用待 B2S 安全窗**（模块被在跑训练 import，军规禁改运行树）。旧记录"min_gen_frames 只盖首个生成块"表述不准，以本条为准：跨块覆盖一直存在，真缺陷是 seed_rem 计数。
+
+**② 训练数据 turn-onset 声学先验探针（判决：中等 ~28%，非饱和 → "模型复读数据 onset"假设死亡）**
+- 方法：zh_train 10 shard × 10 文件随机采样（seed 42），每 onset 取 64 token 过**同一** HiggsAudioV2 vocoder（与生成侧同仪器链，vocoder 伪影对消），fillerometer v1 评分首 1.28s。
+- 读数（thr 0.25）：file-initial onset **28/100**、mid-turn onset **31/85**（中位 0.14–0.18）；**gap-inclusive（从上一 turn 结束处开窗 = 边界吸附 prompt 实际续写的几何）14/85 最干净**。生成侧对照：B2G 88/100、B2S 84/100（中位 ~0.65，峰值 0.94–1.00 超出数据样本极值 0.712）。
+- 高分数据 onset 前 5 条转写全为普通文本零口癖 = 换气/底噪先于干净语音（词汇不可见）——假设的机制真实存在，但只占少数且强度更弱。
+- **结论：配方把 ~28%（实际续写几何 ~14%）的数据先验放大到 85–90% 饱和，≈3–6×**——第二次实证的放大模式（前例：数据 5% 词汇口癖 → 生成 35.6%，7×）。嫌疑收敛到模型/配方侧：EOS 窗先验残留 + CFG 特殊类外推（E1 同款单因子）+ 哼鸣块入 KV 的自激级联。
+- 听感包：perf 克隆 results_data_onset_prior/（high_*.wav ×10 / low_*.wav ×5，文件名带分数）；scores.json 全 270 样本。
