@@ -1,0 +1,719 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+		More than one GPU was found, enabling multi-GPU training.
+		If this was unintended please pass in `--num_processes=1`.
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 142/313 [00:00<00:00, 1400.88it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:  74%|███████▍  | 232/313 [00:00<00:00, 2294.00it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:  90%|█████████ | 283/313 [00:00<00:00, 1019.51it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 1072.97it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 4666.14it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 1688.33it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5546.78it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5425.81it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6949.87it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5358.57it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5266.96it/s]
+07/09/2026 14:20:50 - INFO - omnivoice.training.trainer - Loaded Config: TrainingConfig(output_dir='exp/block_b2j_eos_decouple', data_config='examples/config/data_config_internal_b2g.json', llm_name_or_path='/opt/gpfs/models/Qwen3-0.6B', audio_vocab_size=1026, audio_mask_id=1024, num_audio_codebook=8, audio_codebook_weights=[8, 8, 6, 6, 4, 4, 2, 2], drop_cond_ratio=0.1, prompt_ratio_range=[0.0, 0.7], mask_ratio_range=[0.0, 1.0], language_ratio=0.5, use_pinyin_ratio=0.0, instruct_ratio=0.0, only_instruct_ratio=0.0, elastic=False, p_elastic=0.5, elastic_merge_prob=0.08, elastic_insert_prob=0.04, elastic_end_append_max_ratio=0.25, elastic_mode='legacy', elastic_delta_max=0.3, elastic_mid_insert_frac=0.3, elastic_scheduler_mix=0.5, block_training=True, block_size=32, block_scheme='dual', eos_decouple_silence=True, silence_void_window=32, filter_edge_fillers=True, turn_boundary_prompt_prob=0.5, resume_from_checkpoint='/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000', init_from_checkpoint='/opt/gpfs/users/shuai/work/block-conversion-b2/pretrained_models/OmniVoice-block', learning_rate=3e-05, weight_decay=0.01, max_grad_norm=1.0, steps=58000, seed=42, lr_scheduler_type='cosine', warmup_type='ratio', warmup_ratio=0.01, warmup_steps=0, batch_tokens=20480, gradient_accumulation_steps=1, num_workers=4, perf_blockmask_cache=False, perf_liger=True, perf_fused_adamw=True, perf_mask_buffers=False, perf_compile_skip_attn=False, perf_flex_bf16_qkv=True, perf_balanced_packing=0, perf_torch_compile=False, perf_compile_mode='default', perf_compile_dynamic=True, mixed_precision='bf16', allow_tf32=True, use_deepspeed=False, deepspeed_config=None, attn_implementation='flex_attention', max_sample_tokens=2000, min_sample_tokens=50, max_batch_size=64, logging_steps=100, eval_steps=1000000000, save_steps=5000, keep_last_n_checkpoints=10)
+07/09/2026 14:21:04 - INFO - omnivoice.training.trainer - Starting Training Loop...
+07/09/2026 14:21:04 - INFO - omnivoice.training.checkpoint - Resuming from /opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000
+07/09/2026 14:21:04 - INFO - accelerate.accelerator - [RANK 0] Loading states from /opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000
+07/09/2026 14:21:06 - INFO - accelerate.checkpointing - [RANK 0] All model weights loaded successfully
+07/09/2026 14:21:11 - INFO - accelerate.checkpointing - [RANK 0] All optimizer states loaded successfully
+07/09/2026 14:21:11 - INFO - accelerate.checkpointing - [RANK 0] All scheduler states loaded successfully
+07/09/2026 14:21:11 - INFO - accelerate.checkpointing - [RANK 0] All dataloader sampler states loaded successfully
+07/09/2026 14:21:11 - INFO - accelerate.checkpointing - [RANK 0] All random states loaded successfully
+07/09/2026 14:21:11 - INFO - accelerate.accelerator - [RANK 0] Loading in 0 custom states
+07/09/2026 14:21:11 - INFO - omnivoice.training.trainer - Resumed from step 50000
+Training:  86%|████████▌ | 50000/58000 [00:00<?, ?it/s][rank6]: Traceback (most recent call last):
+[rank6]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank6]:   File "<frozen runpy>", line 88, in _run_code
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank6]:     main()
+[rank6]:     ~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank6]:     trainer.train()
+[rank6]:     ~~~~~~~~~~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank6]:     outputs = self.model(**batch)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank6]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank6]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank6]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank6]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank6]:     return model_forward(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank6]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank6]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank6]:     return func(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank6]:     llm_outputs = self.llm(
+[rank6]:         inputs_embeds=inputs_embeds,
+[rank6]:     ...<2 lines>...
+[rank6]:         position_ids=position_ids,
+[rank6]:     )
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank6]:     output = func(self, *args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank6]:     outputs = func(self, *args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank6]:     hidden_states = decoder_layer(
+[rank6]:         hidden_states,
+[rank6]:     ...<6 lines>...
+[rank6]:         **kwargs,
+[rank6]:     )
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank6]:     return super().__call__(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank6]:     hidden_states, _ = self.self_attn(
+[rank6]:                        ~~~~~~~~~~~~~~^
+[rank6]:         hidden_states=hidden_states,
+[rank6]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank6]:     ...<6 lines>...
+[rank6]:         **kwargs,
+[rank6]:         ^^^^^^^^^
+[rank6]:     )
+[rank6]:     ^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank6]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank6]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank6]:     hidden_states = hidden_states.to(torch.float32)
+[rank6]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 6 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251198 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank1]:   File "<frozen runpy>", line 88, in _run_code
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank1]:     main()
+[rank1]:     ~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank1]:     trainer.train()
+[rank1]:     ~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank1]:     outputs = self.model(**batch)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank1]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank1]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank1]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank1]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank1]:     return model_forward(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank1]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank1]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank1]:     return func(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank1]:     llm_outputs = self.llm(
+[rank1]:         inputs_embeds=inputs_embeds,
+[rank1]:     ...<2 lines>...
+[rank1]:         position_ids=position_ids,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank1]:     output = func(self, *args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank1]:     outputs = func(self, *args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank1]:     hidden_states = decoder_layer(
+[rank1]:         hidden_states,
+[rank1]:     ...<6 lines>...
+[rank1]:         **kwargs,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank1]:     return super().__call__(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank1]:     hidden_states, _ = self.self_attn(
+[rank1]:                        ~~~~~~~~~~~~~~^
+[rank1]:         hidden_states=hidden_states,
+[rank1]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:     ...<6 lines>...
+[rank1]:         **kwargs,
+[rank1]:         ^^^^^^^^^
+[rank1]:     )
+[rank1]:     ^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank1]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank1]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank1]:     hidden_states = hidden_states.to(torch.float32)
+[rank1]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 1 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251193 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank4]:   File "<frozen runpy>", line 88, in _run_code
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank4]:     main()
+[rank4]:     ~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank4]:     trainer.train()
+[rank4]:     ~~~~~~~~~~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank4]:     outputs = self.model(**batch)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank4]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank4]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank4]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank4]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank4]:     return model_forward(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank4]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank4]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank4]:     return func(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank4]:     llm_outputs = self.llm(
+[rank4]:         inputs_embeds=inputs_embeds,
+[rank4]:     ...<2 lines>...
+[rank4]:         position_ids=position_ids,
+[rank4]:     )
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank4]:     output = func(self, *args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank4]:     outputs = func(self, *args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank4]:     hidden_states = decoder_layer(
+[rank4]:         hidden_states,
+[rank4]:     ...<6 lines>...
+[rank4]:         **kwargs,
+[rank4]:     )
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank4]:     return super().__call__(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank4]:     hidden_states, _ = self.self_attn(
+[rank4]:                        ~~~~~~~~~~~~~~^
+[rank4]:         hidden_states=hidden_states,
+[rank4]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:     ...<6 lines>...
+[rank4]:         **kwargs,
+[rank4]:         ^^^^^^^^^
+[rank4]:     )
+[rank4]:     ^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank4]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank4]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank4]:     hidden_states = hidden_states.to(torch.float32)
+[rank4]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 4 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251196 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank5]:   File "<frozen runpy>", line 88, in _run_code
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank5]:     main()
+[rank5]:     ~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank5]:     trainer.train()
+[rank5]:     ~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank5]:     outputs = self.model(**batch)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank5]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank5]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank5]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank5]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank5]:     return model_forward(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank5]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank5]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank5]:     return func(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank5]:     llm_outputs = self.llm(
+[rank5]:         inputs_embeds=inputs_embeds,
+[rank5]:     ...<2 lines>...
+[rank5]:         position_ids=position_ids,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank5]:     output = func(self, *args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank5]:     outputs = func(self, *args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank5]:     hidden_states = decoder_layer(
+[rank5]:         hidden_states,
+[rank5]:     ...<6 lines>...
+[rank5]:         **kwargs,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank5]:     return super().__call__(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank5]:     hidden_states, _ = self.self_attn(
+[rank5]:                        ~~~~~~~~~~~~~~^
+[rank5]:         hidden_states=hidden_states,
+[rank5]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:     ...<6 lines>...
+[rank5]:         **kwargs,
+[rank5]:         ^^^^^^^^^
+[rank5]:     )
+[rank5]:     ^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank5]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank5]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank5]:     hidden_states = hidden_states.to(torch.float32)
+[rank5]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 5 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251197 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank3]:   File "<frozen runpy>", line 88, in _run_code
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank3]:     main()
+[rank3]:     ~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank3]:     trainer.train()
+[rank3]:     ~~~~~~~~~~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank3]:     outputs = self.model(**batch)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank3]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank3]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank3]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank3]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank3]:     return model_forward(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank3]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank3]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank3]:     return func(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank3]:     llm_outputs = self.llm(
+[rank3]:         inputs_embeds=inputs_embeds,
+[rank3]:     ...<2 lines>...
+[rank3]:         position_ids=position_ids,
+[rank3]:     )
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank3]:     output = func(self, *args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank3]:     outputs = func(self, *args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank3]:     hidden_states = decoder_layer(
+[rank3]:         hidden_states,
+[rank3]:     ...<6 lines>...
+[rank3]:         **kwargs,
+[rank3]:     )
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank3]:     return super().__call__(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank3]:     hidden_states, _ = self.self_attn(
+[rank3]:                        ~~~~~~~~~~~~~~^
+[rank3]:         hidden_states=hidden_states,
+[rank3]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:     ...<6 lines>...
+[rank3]:         **kwargs,
+[rank3]:         ^^^^^^^^^
+[rank3]:     )
+[rank3]:     ^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank3]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank3]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank3]:     hidden_states = hidden_states.to(torch.float32)
+[rank3]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 3 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251195 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank0]:   File "<frozen runpy>", line 88, in _run_code
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank0]:     main()
+[rank0]:     ~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank0]:     trainer.train()
+[rank0]:     ~~~~~~~~~~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank0]:     outputs = self.model(**batch)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank0]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank0]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank0]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank0]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank0]:     return model_forward(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank0]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank0]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank0]:     return func(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank0]:     llm_outputs = self.llm(
+[rank0]:         inputs_embeds=inputs_embeds,
+[rank0]:     ...<2 lines>...
+[rank0]:         position_ids=position_ids,
+[rank0]:     )
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank0]:     output = func(self, *args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank0]:     outputs = func(self, *args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank0]:     hidden_states = decoder_layer(
+[rank0]:         hidden_states,
+[rank0]:     ...<6 lines>...
+[rank0]:         **kwargs,
+[rank0]:     )
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank0]:     return super().__call__(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank0]:     hidden_states, _ = self.self_attn(
+[rank0]:                        ~~~~~~~~~~~~~~^
+[rank0]:         hidden_states=hidden_states,
+[rank0]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:     ...<6 lines>...
+[rank0]:         **kwargs,
+[rank0]:         ^^^^^^^^^
+[rank0]:     )
+[rank0]:     ^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank0]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank0]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank0]:     hidden_states = hidden_states.to(torch.float32)
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 0 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251192 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank2]:   File "<frozen runpy>", line 88, in _run_code
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank2]:     main()
+[rank2]:     ~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank2]:     trainer.train()
+[rank2]:     ~~~~~~~~~~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank2]:     outputs = self.model(**batch)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank2]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank2]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank2]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank2]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank2]:     return model_forward(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank2]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank2]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank2]:     return func(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 525, in forward
+[rank2]:     llm_outputs = self.llm(
+[rank2]:         inputs_embeds=inputs_embeds,
+[rank2]:     ...<2 lines>...
+[rank2]:         position_ids=position_ids,
+[rank2]:     )
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank2]:     output = func(self, *args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank2]:     outputs = func(self, *args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank2]:     hidden_states = decoder_layer(
+[rank2]:         hidden_states,
+[rank2]:     ...<6 lines>...
+[rank2]:         **kwargs,
+[rank2]:     )
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 93, in __call__
+[rank2]:     return super().__call__(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank2]:     hidden_states, _ = self.self_attn(
+[rank2]:                        ~~~~~~~~~~~~~~^
+[rank2]:         hidden_states=hidden_states,
+[rank2]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:     ...<6 lines>...
+[rank2]:         **kwargs,
+[rank2]:         ^^^^^^^^^
+[rank2]:     )
+[rank2]:     ^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 264, in forward
+[rank2]:     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+[rank2]:                    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 61, in forward
+[rank2]:     hidden_states = hidden_states.to(torch.float32)
+[rank2]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 160.00 MiB. GPU 2 has a total capacity of 23.52 GiB of which 159.50 MiB is free. Process 251194 has 23.35 GiB memory in use. Of the allocated memory 22.74 GiB is allocated by PyTorch, and 27.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Training:  86%|████████▌ | 50000/58000 [00:41<?, ?it/s]
+[rank0]:[W709 14:21:53.911819535 ProcessGroupNCCL.cpp:1538] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W0709 14:21:54.631000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 513 closing signal SIGTERM
+W0709 14:21:54.632000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 514 closing signal SIGTERM
+W0709 14:21:54.633000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 515 closing signal SIGTERM
+W0709 14:21:54.634000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 516 closing signal SIGTERM
+W0709 14:21:54.635000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 517 closing signal SIGTERM
+W0709 14:21:54.636000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 519 closing signal SIGTERM
+W0709 14:21:54.637000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 520 closing signal SIGTERM
+E0709 14:21:56.524000 379 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 5 (pid: 518) of binary: /opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/python
+Traceback (most recent call last):
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/accelerate", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/accelerate_cli.py", line 50, in main
+    args.func(args)
+    ~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1396, in launch_command
+    multi_gpu_launcher(args)
+    ~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1023, in multi_gpu_launcher
+    distrib_run.run(args)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/run.py", line 892, in run
+    elastic_launch(
+    ~~~~~~~~~~~~~~~
+        config=config,
+        ~~~~~~~~~~~~~~
+        entrypoint=cmd,
+        ~~~~~~~~~~~~~~~
+    )(*cmd_args)
+    ~^^^^^^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 143, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 277, in launch_agent
+    raise ChildFailedError(
+    ...<2 lines>...
+    )
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+omnivoice.cli.train FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-07-09_14:21:54
+  host      : shuai-block-b2j-worker-0.shuai-block-b2j.devpod3.svc.cluster.local
+  rank      : 5 (local_rank: 5)
+  exitcode  : 1 (pid: 518)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

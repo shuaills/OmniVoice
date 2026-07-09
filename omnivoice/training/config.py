@@ -96,6 +96,10 @@ class TrainingConfig:
 
     # Init settings
     resume_from_checkpoint: Optional[str] = None
+    # On resume, re-force the LR envelope from this config: checkpoint
+    # optimizer.bin/scheduler.bin carry the original run's base_lrs, which
+    # otherwise silently override a changed learning_rate (b2j lesson).
+    force_lr_from_config_on_resume: bool = False
     init_from_checkpoint: Optional[str] = None
 
     # Training Hyperparams

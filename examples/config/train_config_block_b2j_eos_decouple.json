@@ -55,5 +55,6 @@
   "perf_fused_adamw": true,
   "perf_flex_bf16_qkv": true,
   "eos_decouple_silence": true,
-  "silence_void_window": 32
+  "silence_void_window": 32,
+  "force_lr_from_config_on_resume": true
 }

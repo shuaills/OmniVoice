@@ -248,6 +248,20 @@ class OmniTrainer:
         # Resume if configured
         if self.config.resume_from_checkpoint:
             self.load_checkpoint(self.config.resume_from_checkpoint)
+            if getattr(self.config, "force_lr_from_config_on_resume", False):
+                base = self.config.learning_rate
+                inner = self.lr_scheduler
+                while hasattr(inner, "scheduler"):
+                    inner = inner.scheduler
+                inner.base_lrs = [base] * len(inner.base_lrs)
+                lam = inner.lr_lambdas[0](inner.last_epoch)
+                for group in self.optimizer.param_groups:
+                    group["initial_lr"] = base
+                    group["lr"] = base * lam
+                logger.info(
+                    f"force_lr_from_config_on_resume: base_lr={base}, "
+                    f"lr at resumed step {inner.last_epoch} = {base * lam:.3e}"
+                )
 
         # Handle IterableDataset Epochs
         if hasattr(self.train_dataloader.dataset, "set_epoch"):

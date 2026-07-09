@@ -1,0 +1,504 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+		More than one GPU was found, enabling multi-GPU training.
+		If this was unintended please pass in `--num_processes=1`.
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 7413.70it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 7636.21it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5491.56it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5259.81it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6935.44it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6097.45it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6332.20it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 4547.81it/s]
+07/09/2026 14:27:41 - INFO - omnivoice.training.trainer - Loaded Config: TrainingConfig(output_dir='exp/block_b2j_eos_decouple', data_config='examples/config/data_config_internal_b2g.json', llm_name_or_path='/opt/gpfs/models/Qwen3-0.6B', audio_vocab_size=1026, audio_mask_id=1024, num_audio_codebook=8, audio_codebook_weights=[8, 8, 6, 6, 4, 4, 2, 2], drop_cond_ratio=0.1, prompt_ratio_range=[0.0, 0.7], mask_ratio_range=[0.0, 1.0], language_ratio=0.5, use_pinyin_ratio=0.0, instruct_ratio=0.0, only_instruct_ratio=0.0, elastic=False, p_elastic=0.5, elastic_merge_prob=0.08, elastic_insert_prob=0.04, elastic_end_append_max_ratio=0.25, elastic_mode='legacy', elastic_delta_max=0.3, elastic_mid_insert_frac=0.3, elastic_scheduler_mix=0.5, block_training=True, block_size=32, block_scheme='dual', eos_decouple_silence=True, silence_void_window=32, filter_edge_fillers=True, turn_boundary_prompt_prob=0.5, resume_from_checkpoint='/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000', init_from_checkpoint='/opt/gpfs/users/shuai/work/block-conversion-b2/pretrained_models/OmniVoice-block', learning_rate=3e-05, weight_decay=0.01, max_grad_norm=1.0, steps=58000, seed=42, lr_scheduler_type='cosine', warmup_type='ratio', warmup_ratio=0.01, warmup_steps=0, batch_tokens=5120, gradient_accumulation_steps=4, num_workers=4, perf_blockmask_cache=False, perf_liger=True, perf_fused_adamw=True, perf_mask_buffers=False, perf_compile_skip_attn=False, perf_flex_bf16_qkv=True, perf_balanced_packing=0, perf_torch_compile=False, perf_compile_mode='default', perf_compile_dynamic=True, mixed_precision='bf16', allow_tf32=True, use_deepspeed=False, deepspeed_config=None, attn_implementation='flex_attention', max_sample_tokens=2000, min_sample_tokens=50, max_batch_size=64, logging_steps=100, eval_steps=1000000000, save_steps=5000, keep_last_n_checkpoints=10)
+07/09/2026 14:27:44 - INFO - omnivoice.training.trainer - Starting Training Loop...
+07/09/2026 14:27:44 - INFO - omnivoice.training.checkpoint - Resuming from /opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000
+07/09/2026 14:27:44 - INFO - accelerate.accelerator - [RANK 0] Loading states from /opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice/exp/block_b2g/checkpoint-50000
+07/09/2026 14:27:46 - INFO - accelerate.checkpointing - [RANK 0] All model weights loaded successfully
+07/09/2026 14:27:51 - INFO - accelerate.checkpointing - [RANK 0] All optimizer states loaded successfully
+07/09/2026 14:27:51 - INFO - accelerate.checkpointing - [RANK 0] All scheduler states loaded successfully
+07/09/2026 14:27:51 - INFO - accelerate.checkpointing - [RANK 0] All dataloader sampler states loaded successfully
+07/09/2026 14:27:51 - INFO - accelerate.checkpointing - [RANK 0] All random states loaded successfully
+07/09/2026 14:27:51 - INFO - accelerate.accelerator - [RANK 0] Loading in 0 custom states
+07/09/2026 14:27:51 - INFO - omnivoice.training.trainer - Resumed from step 50000
+Training:  86%|████████▌ | 50000/58000 [00:00<?, ?it/s][rank2]: Traceback (most recent call last):
+[rank2]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank2]:   File "<frozen runpy>", line 88, in _run_code
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank2]:     main()
+[rank2]:     ~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank2]:     trainer.train()
+[rank2]:     ~~~~~~~~~~~~~^^
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank2]:     outputs = self.model(**batch)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank2]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank2]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank2]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank2]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank2]:     return model_forward(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank2]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank2]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank2]:     return func(*args, **kwargs)
+[rank2]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank2]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank2]:         audio_logits.permute(0, 3, 1, 2),
+[rank2]:     ...<2 lines>...
+[rank2]:         ignore_index=-100,
+[rank2]:     )
+[rank2]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank2]:     return torch._C._nn.cross_entropy_loss(
+[rank2]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank2]:         input,
+[rank2]:         ^^^^^^
+[rank2]:     ...<4 lines>...
+[rank2]:         label_smoothing,
+[rank2]:         ^^^^^^^^^^^^^^^^
+[rank2]:     )
+[rank2]:     ^
+[rank2]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 2 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265115 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank7]: Traceback (most recent call last):
+[rank7]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank7]:   File "<frozen runpy>", line 88, in _run_code
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank7]:     main()
+[rank7]:     ~~~~^^
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank7]:     trainer.train()
+[rank7]:     ~~~~~~~~~~~~~^^
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank7]:     outputs = self.model(**batch)
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank7]:     return self._call_impl(*args, **kwargs)
+[rank7]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank7]:     return forward_call(*args, **kwargs)
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank7]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank7]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank7]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank7]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank7]:     return self._call_impl(*args, **kwargs)
+[rank7]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank7]:     return forward_call(*args, **kwargs)
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank7]:     return model_forward(*args, **kwargs)
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank7]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank7]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank7]:     return func(*args, **kwargs)
+[rank7]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank7]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank7]:         audio_logits.permute(0, 3, 1, 2),
+[rank7]:     ...<2 lines>...
+[rank7]:         ignore_index=-100,
+[rank7]:     )
+[rank7]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank7]:     return torch._C._nn.cross_entropy_loss(
+[rank7]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank7]:         input,
+[rank7]:         ^^^^^^
+[rank7]:     ...<4 lines>...
+[rank7]:         label_smoothing,
+[rank7]:         ^^^^^^^^^^^^^^^^
+[rank7]:     )
+[rank7]:     ^
+[rank7]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 7 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265120 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank6]: Traceback (most recent call last):
+[rank6]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank6]:   File "<frozen runpy>", line 88, in _run_code
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank6]:     main()
+[rank6]:     ~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank6]:     trainer.train()
+[rank6]:     ~~~~~~~~~~~~~^^
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank6]:     outputs = self.model(**batch)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank6]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank6]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank6]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank6]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank6]:     return self._call_impl(*args, **kwargs)
+[rank6]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank6]:     return forward_call(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank6]:     return model_forward(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank6]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank6]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank6]:     return func(*args, **kwargs)
+[rank6]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank6]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank6]:         audio_logits.permute(0, 3, 1, 2),
+[rank6]:     ...<2 lines>...
+[rank6]:         ignore_index=-100,
+[rank6]:     )
+[rank6]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank6]:     return torch._C._nn.cross_entropy_loss(
+[rank6]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank6]:         input,
+[rank6]:         ^^^^^^
+[rank6]:     ...<4 lines>...
+[rank6]:         label_smoothing,
+[rank6]:         ^^^^^^^^^^^^^^^^
+[rank6]:     )
+[rank6]:     ^
+[rank6]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 6 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265119 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank5]:   File "<frozen runpy>", line 88, in _run_code
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank5]:     main()
+[rank5]:     ~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank5]:     trainer.train()
+[rank5]:     ~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank5]:     outputs = self.model(**batch)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank5]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank5]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank5]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank5]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank5]:     return model_forward(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank5]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank5]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank5]:     return func(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank5]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank5]:         audio_logits.permute(0, 3, 1, 2),
+[rank5]:     ...<2 lines>...
+[rank5]:         ignore_index=-100,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank5]:     return torch._C._nn.cross_entropy_loss(
+[rank5]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank5]:         input,
+[rank5]:         ^^^^^^
+[rank5]:     ...<4 lines>...
+[rank5]:         label_smoothing,
+[rank5]:         ^^^^^^^^^^^^^^^^
+[rank5]:     )
+[rank5]:     ^
+[rank5]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 5 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265118 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank1]:   File "<frozen runpy>", line 88, in _run_code
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank1]:     main()
+[rank1]:     ~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank1]:     trainer.train()
+[rank1]:     ~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank1]:     outputs = self.model(**batch)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank1]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank1]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank1]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank1]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank1]:     return model_forward(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank1]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank1]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank1]:     return func(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank1]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank1]:         audio_logits.permute(0, 3, 1, 2),
+[rank1]:     ...<2 lines>...
+[rank1]:         ignore_index=-100,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank1]:     return torch._C._nn.cross_entropy_loss(
+[rank1]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank1]:         input,
+[rank1]:         ^^^^^^
+[rank1]:     ...<4 lines>...
+[rank1]:         label_smoothing,
+[rank1]:         ^^^^^^^^^^^^^^^^
+[rank1]:     )
+[rank1]:     ^
+[rank1]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 1 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265114 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank0]:   File "<frozen runpy>", line 88, in _run_code
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank0]:     main()
+[rank0]:     ~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank0]:     trainer.train()
+[rank0]:     ~~~~~~~~~~~~~^^
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank0]:     outputs = self.model(**batch)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank0]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank0]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank0]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank0]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank0]:     return model_forward(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank0]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank0]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank0]:     return func(*args, **kwargs)
+[rank0]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank0]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank0]:         audio_logits.permute(0, 3, 1, 2),
+[rank0]:     ...<2 lines>...
+[rank0]:         ignore_index=-100,
+[rank0]:     )
+[rank0]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank0]:     return torch._C._nn.cross_entropy_loss(
+[rank0]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank0]:         input,
+[rank0]:         ^^^^^^
+[rank0]:     ...<4 lines>...
+[rank0]:         label_smoothing,
+[rank0]:         ^^^^^^^^^^^^^^^^
+[rank0]:     )
+[rank0]:     ^
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 0 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265113 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank4]:   File "<frozen runpy>", line 88, in _run_code
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank4]:     main()
+[rank4]:     ~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank4]:     trainer.train()
+[rank4]:     ~~~~~~~~~~~~~^^
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank4]:     outputs = self.model(**batch)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank4]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank4]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank4]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank4]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank4]:     return self._call_impl(*args, **kwargs)
+[rank4]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank4]:     return forward_call(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank4]:     return model_forward(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank4]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank4]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank4]:     return func(*args, **kwargs)
+[rank4]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank4]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank4]:         audio_logits.permute(0, 3, 1, 2),
+[rank4]:     ...<2 lines>...
+[rank4]:         ignore_index=-100,
+[rank4]:     )
+[rank4]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank4]:     return torch._C._nn.cross_entropy_loss(
+[rank4]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank4]:         input,
+[rank4]:         ^^^^^^
+[rank4]:     ...<4 lines>...
+[rank4]:         label_smoothing,
+[rank4]:         ^^^^^^^^^^^^^^^^
+[rank4]:     )
+[rank4]:     ^
+[rank4]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 4 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265117 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank3]:   File "<frozen runpy>", line 88, in _run_code
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank3]:     main()
+[rank3]:     ~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank3]:     trainer.train()
+[rank3]:     ~~~~~~~~~~~~~^^
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/training/trainer.py", line 285, in train
+[rank3]:     outputs = self.model(**batch)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank3]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank3]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank3]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank3]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank3]:     return model_forward(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank3]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank3]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank3]:     return func(*args, **kwargs)
+[rank3]:   File "/opt/gpfs/users/shuai/work/block-b2-eosdecouple/OmniVoice/omnivoice/models/omnivoice.py", line 551, in forward
+[rank3]:     per_token_loss = torch.nn.functional.cross_entropy(
+[rank3]:         audio_logits.permute(0, 3, 1, 2),
+[rank3]:     ...<2 lines>...
+[rank3]:         ignore_index=-100,
+[rank3]:     )
+[rank3]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 3462, in cross_entropy
+[rank3]:     return torch._C._nn.cross_entropy_loss(
+[rank3]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[rank3]:         input,
+[rank3]:         ^^^^^^
+[rank3]:     ...<4 lines>...
+[rank3]:         label_smoothing,
+[rank3]:         ^^^^^^^^^^^^^^^^
+[rank3]:     )
+[rank3]:     ^
+[rank3]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 162.00 MiB. GPU 3 has a total capacity of 23.52 GiB of which 117.50 MiB is free. Process 265116 has 23.39 GiB memory in use. Of the allocated memory 22.77 GiB is allocated by PyTorch, and 29.59 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Training:  86%|████████▌ | 50000/58000 [00:38<?, ?it/s]
+[rank0]:[W709 14:28:30.195707551 ProcessGroupNCCL.cpp:1538] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W0709 14:28:31.942000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 514 closing signal SIGTERM
+W0709 14:28:31.945000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 515 closing signal SIGTERM
+W0709 14:28:31.946000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 517 closing signal SIGTERM
+W0709 14:28:31.947000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 518 closing signal SIGTERM
+W0709 14:28:31.949000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 519 closing signal SIGTERM
+W0709 14:28:31.950000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 520 closing signal SIGTERM
+W0709 14:28:31.952000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 521 closing signal SIGTERM
+E0709 14:28:33.724000 380 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 2 (pid: 516) of binary: /opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/python
+Traceback (most recent call last):
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/accelerate", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/accelerate_cli.py", line 50, in main
+    args.func(args)
+    ~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1396, in launch_command
+    multi_gpu_launcher(args)
+    ~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1023, in multi_gpu_launcher
+    distrib_run.run(args)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/run.py", line 892, in run
+    elastic_launch(
+    ~~~~~~~~~~~~~~~
+        config=config,
+        ~~~~~~~~~~~~~~
+        entrypoint=cmd,
+        ~~~~~~~~~~~~~~~
+    )(*cmd_args)
+    ~^^^^^^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 143, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 277, in launch_agent
+    raise ChildFailedError(
+    ...<2 lines>...
+    )
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+omnivoice.cli.train FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-07-09_14:28:31
+  host      : shuai-block-b2j-worker-0.shuai-block-b2j.devpod3.svc.cluster.local
+  rank      : 2 (local_rank: 2)
+  exitcode  : 1 (pid: 516)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
