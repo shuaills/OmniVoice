@@ -9,7 +9,7 @@ cd "${REPO_ROOT}"
 source "${DONOR_VENV}/bin/activate"
 export PYTHONPATH="${REPO_ROOT}:/opt/gpfs/users/shuai/work/block-b2-perf/pylibs"   # our branch must shadow the venv editable install
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
-python -c "import omnivoice, sys; p=omnivoice.__file__; print(\x27omnivoice from:\x27, p); sys.exit(0 if p.startswith(\x27${REPO_ROOT}\x27) else 1)"
+python -c "import omnivoice, sys; p=omnivoice.__file__; print('omnivoice from:', p); sys.exit(0 if p.startswith('${REPO_ROOT}') else 1)"
 mkdir -p logs
 NUM_GPUS="${NUM_GPUS:-8}"
 GPU_IDS="$(seq -s, 0 $((NUM_GPUS-1)))"
