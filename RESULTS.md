@@ -686,3 +686,11 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 - B2S (from-scratch 500k) Running on the freed node: 7000/500000 @ ~0.62 s/it, loss 5.55 and falling, grad_norm 0.70, lr warmup exactly on schedule (9.8e-5 = 2.1e-4 × 7k/15k). Survived the first-1000-step life-or-death window.
 
 **Upstream PR submitted: k2-fsa/OmniVoice#212** — AttentionInterface-registered autocast cast for flex q/k/v (the fp32-attention root cause; upstream-native since the founding commit). Smoke-tested on stock transformers 5.13 (CPU repro: fp32 at boundary → bf16 at kernel; no-op without autocast). Corroboration from upstream PR #74 (FA2 inference, open since April, unreviewed): SDPA and FA2 both get cast protection inside transformers — flex is the only unprotected backend, and it is the one training uses. Evidence figures (cross-boundary timeline + kernel comparison) in progress for the PR comment thread.
+
+## 2026-07-09 晚 — B2G-50k dev3-4090 探针轮（子集定方向；全集 shuai-b2g-eval 仍 Pending 队首）
+
+- **Junction 12-prompt（ban=0）：2/12 瞬停**（均为原难 prompt：10002430-00000015 T=1、10003502-00000044 T=0；10002481-00000105 T=170 与 10002753-00000006 T=160 已恢复；新 8 条全干净 T=120–209；lead0=0 全场）。对照 v2@15k 的 3/12。
+- **口癖 first-100 zh：ASR 判据计 23/100** [criterion reconstructed] vs B2 基线 18.2%。**用户耳测推翻计数器：多数文件首块整块为 嗯/呃** → paraformer 把多数非词汇哼鸣直接吞掉，23% 与 18.2% 都是严重低估的地板读数。三个数据制度（YODAS / 过滤 YODAS / 官方 436kh）表型不变 → **口癖病理纯属配方几何，与数据零相关**。杠杆 3a（B2H）动机最强化。
+- **WER-100 预览**：Seed-TTS Avg 4.69%（weighted 4.22%）。
+- **尾部怪声法证（用户耳测 10002745-00000044 句末异响，怀疑"EOS 被 vocoder 吃"）**：100/100 wav 时长与 frames/25 完全一致（中位 overhang 0.000s），eos=true 100/100 → **vocoder 越界渲染假设否证**；异响 = 末块内容结束与 EOS 之间的格子被并行去掩码任意提交（残差提交机制，onset 口癖的尾侧孪生）。
+- 工程：launcher ref_audio 基路径修复 79e2e35（否则全集 SIM 阶段会 FileNotFound）；100 条生成音频 + 100 条参考音频已拉用户本地（~/Desktop/b2g_50k_audio/zh_first100/）。
