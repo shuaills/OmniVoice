@@ -31,7 +31,7 @@ gen_lang() {
   local out="${RES}/seedtts_${lang}"
   mkdir -p "${out}"
   local pids=() rc=0
-  NGPU="${NGPU:-8}"
+  NGPU="${NGPU:-$(nvidia-smi -L 2>/dev/null | wc -l)}"; NGPU="${NGPU:-8}"
   for i in $(seq 0 $((NGPU-1))); do
     CUDA_VISIBLE_DEVICES=$i python tests/seedtts_blockwise_gen.py \
       --tsv "${tsv}" --ckpt "${CKPT}" --base "${BASE}" --out "${out}" \
