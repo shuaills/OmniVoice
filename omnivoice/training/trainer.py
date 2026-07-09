@@ -164,6 +164,7 @@ class OmniTrainer:
             self.model.parameters(),
             lr=self.config.learning_rate,
             weight_decay=self.config.weight_decay,
+            fused=getattr(self.config, "perf_fused_adamw", False) or None,
         )
 
         if self.config.warmup_type == "ratio":

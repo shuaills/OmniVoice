@@ -118,6 +118,105 @@ def build_model_and_tokenizer(
     # 3. Resize Embeddings
     if len(tokenizer) != model.config.llm_config.vocab_size:
         model.llm.resize_token_embeddings(len(tokenizer))
+
+    # ---- perf experiment hooks (perf/step-time-20260708; default OFF) ----
+    if config.perf_blockmask_cache:
+        model._perf_blockmask_cache = True
+        logger.info("PERF: BlockMask memoization enabled")
+    if config.perf_mask_buffers:
+        model._perf_mask_buffers = True
+        logger.info("PERF: persistent mask buffers enabled")
+
+    if config.perf_flex_bf16_qkv:
+        # ROOT-CAUSE FIX (16x anomaly): under accelerate bf16 mixed precision
+        # with fp32 master weights, transformers-5.3 Qwen3 feeds flex
+        # attention FP32 q/k/v (RMSNorm weight-dtype promotion + fp32 rope
+        # constants). fp32 flex backward at head_dim=128 runs ~7x slower.
+        # Cast q/k/v to bf16 at the attention boundary; autograd casts the
+        # grads back to fp32 automatically. Output stays bf16 (o_proj input
+        # under autocast would be bf16 anyway).
+        import transformers.integrations.flex_attention as _fa2
+        from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS as _AAF2
+        import torch as _torch2
+
+        _orig_flex = _fa2.flex_attention_forward
+
+        def _bf16_flex(module, query, key, value, attention_mask, *a2, **kw2):
+            return _orig_flex(
+                module,
+                query.to(_torch2.bfloat16),
+                key.to(_torch2.bfloat16),
+                value.to(_torch2.bfloat16),
+                attention_mask,
+                *a2,
+                **kw2,
+            )
+
+        _fa2.flex_attention_forward = _bf16_flex
+        try:
+            _AAF2["flex_attention"] = _bf16_flex
+        except Exception:
+            _AAF2.register("flex_attention", _bf16_flex)
+        logger.info("PERF: flex q/k/v bf16 cast enabled (fp32-attention fix)")
+
+    if config.perf_liger:
+        # Requires liger-kernel on PYTHONPATH (perf pylibs dir; NOT installed
+        # into the donor venv). rope patches the transformers module globally;
+        # rms_norm/swiglu rebind instance forwards.
+        import transformers.models.qwen3.modeling_qwen3 as _mq3
+        from liger_kernel.transformers import apply_liger_kernel_to_qwen3
+
+        apply_liger_kernel_to_qwen3(
+            rope=True,
+            rms_norm=True,
+            swiglu=True,
+            cross_entropy=False,
+            fused_linear_cross_entropy=False,  # tiny 1026 vocab: irrelevant
+            model=model.llm,
+        )
+        _base = getattr(model.llm, model.llm.base_model_prefix, model.llm)
+        _l0 = _base.layers[0]
+        _took = (
+            _mq3.apply_rotary_pos_emb.__module__.startswith("liger_kernel")
+            and _l0.input_layernorm.forward.__func__.__module__.startswith(
+                "liger_kernel"
+            )
+            and _l0.mlp.forward.__func__.__module__.startswith("liger_kernel")
+        )
+        if not _took:
+            raise RuntimeError(
+                "PERF: liger patch did not take (rope/rms/swiglu check "
+                "failed) -- refusing to run a silently-baseline arm"
+            )
+        logger.info("PERF: liger kernels applied (rope+rms_norm+swiglu verified)")
+
+    if config.perf_torch_compile:
+        import torch as _torch
+
+        if config.perf_compile_skip_attn:
+            # Graph-break around attention: flex runs eager (HF singleton),
+            # inductor compiles only the glue. Bisects whether inductor's
+            # flex lowering is the parity-corrupting op.
+            import transformers.integrations.flex_attention as _fa
+            from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS as _AAF
+
+            _disabled = _torch._dynamo.disable(_fa.flex_attention_forward)
+            _fa.flex_attention_forward = _disabled
+            try:
+                _AAF["flex_attention"] = _disabled
+            except Exception:
+                _AAF.register("flex_attention", _disabled)
+            logger.info("PERF: attention excluded from torch.compile scope")
+        logger.info(
+            "PERF: torch.compile(model.llm, mode=%s, dynamic=%s)",
+            config.perf_compile_mode,
+            config.perf_compile_dynamic,
+        )
+        model.llm = _torch.compile(
+            model.llm,
+            mode=config.perf_compile_mode,
+            dynamic=config.perf_compile_dynamic,
+        )
         model.config.llm_config.vocab_size = len(tokenizer)
 
     # 4. Config IDs
@@ -220,6 +319,8 @@ def build_dataloaders(
     if use_packing:
         train_dataset = PackingIterableDataset(
             raw_train_ds, processor, config.batch_tokens
+        ,
+            balanced_window=getattr(config, 'perf_balanced_packing', 0),
         )
         collate_fn = PackingDataCollator(processor, config.batch_tokens)
     else:

@@ -104,6 +104,21 @@ class TrainingConfig:
     gradient_accumulation_steps: int = 1
     num_workers: int = 8
 
+    # Perf experiments (perf/step-time-20260708). Default OFF => inert.
+    # NOTE: from_json silently drops unknown keys, so these MUST be real
+    # fields -- otherwise an A/B arm would silently run as baseline.
+    perf_blockmask_cache: bool = False
+    perf_liger: bool = False
+    perf_fused_adamw: bool = False
+    perf_mask_buffers: bool = False
+    perf_compile_skip_attn: bool = False
+    perf_flex_bf16_qkv: bool = False
+    # >0 enables cost-balanced packing with this window (in packs).
+    perf_balanced_packing: int = 0
+    perf_torch_compile: bool = False
+    perf_compile_mode: str = "default"
+    perf_compile_dynamic: bool = True
+
     # System
     mixed_precision: str = "bf16"
     allow_tf32: bool = True
