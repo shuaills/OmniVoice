@@ -51,5 +51,8 @@
   "block_scheme": "dual",
   "filter_edge_fillers": true,
   "lr_scheduler_type": "cosine",
-  "turn_boundary_prompt_prob": 0.5
+  "turn_boundary_prompt_prob": 0.5,
+  "perf_liger": true,
+  "perf_fused_adamw": true,
+  "perf_flex_bf16_qkv": true
 }

@@ -5,7 +5,7 @@ REPO_ROOT="/opt/gpfs/users/shuai/work/block-conversion-b2/OmniVoice"
 DONOR_VENV="/opt/gpfs/users/yinfeng/work/OmniVoice/.venv"
 cd "${REPO_ROOT}"
 source "${DONOR_VENV}/bin/activate"
-export PYTHONPATH="${REPO_ROOT}"   # our branch must shadow the venv editable install
+export PYTHONPATH="${REPO_ROOT}:/opt/gpfs/users/shuai/work/block-b2-perf/pylibs"   # our branch must shadow the venv editable install
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 python -c "import omnivoice, sys; p=omnivoice.__file__; print('omnivoice from:', p); sys.exit(0 if p.startswith('${REPO_ROOT}') else 1)"
 mkdir -p logs
