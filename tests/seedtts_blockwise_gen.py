@@ -94,6 +94,11 @@ for k, row in enumerate(rows):
             num_step_per_block=args.steps_per_block, use_kv_cache=True,
             seed_audio=ref_toks,
             min_gen_frames=max(8, int(0.3 * model._estimate_target_tokens(ttext, None, None))))
+        _dd = os.environ.get('DUMP_TOKENS_DIR')
+        if _dd:
+            import numpy as _np
+            os.makedirs(_dd, exist_ok=True)
+            _np.save(os.path.join(_dd, utt_id + '.npy'), toks.cpu().numpy())
         if toks.size(1) == 0:
             raise RuntimeError('empty generation')
         wav_np = (tok.decode(toks.to(tok.device).unsqueeze(0))

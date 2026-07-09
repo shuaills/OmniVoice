@@ -338,6 +338,19 @@ def _forward_text_prefix(model, text_ids, positions, attn4d, past_key_values):
     )
 
 
+def gen_frame_positions(committed_len, seed_total, bs, device):
+    """True generated-frame index for each column of the current noisy block.
+
+    committed_len counts full committed blocks (which, after the first
+    generated block, INCLUDE any partial-prompt prefill seed_rem), so the
+    generated count must be taken against seed_total, not seed_blocks*bs.
+    Prefilled prompt columns come out negative; callers must additionally
+    exclude them (jr < n_pre) from any generated-position logic.
+    """
+    jr = torch.arange(bs, device=device)
+    return committed_len - seed_total + jr, jr
+
+
 @torch.no_grad()
 def _decode_block_causal(
     model,
@@ -516,14 +529,19 @@ def _decode_block_causal(
                     u_logits = c_logits
 
             if min_gen_frames > 0:
-                gen_committed = committed.size(1) - seed_blocks * bs
-                jr = torch.arange(bs, device=device)
-                gen_pos = gen_committed + (jr - n_pre)
-                ban_cols = gen_pos < min_gen_frames
+                gen_pos, jr = gen_frame_positions(
+                    committed.size(1), seed_total, bs, device)
+                ban_cols = (jr >= n_pre) & (gen_pos < min_gen_frames)
                 if ban_cols.any():
-                    c_logits[0, 0, ban_cols, eos] = -float("inf")
+                    # Pre-CFG bans must stay finite: -inf in both c and u makes
+                    # the log-prob combine produce NaN (inf - inf), and the
+                    # outer log_softmax spreads it across the whole row, whose
+                    # argmax then lands on index 0. finfo.min rather than a
+                    # hand constant: -1e30 overflows back to -inf in fp16.
+                    _neg = torch.finfo(c_logits.dtype).min
+                    c_logits[0, 0, ban_cols, eos] = _neg
                     if u_logits is not c_logits:
-                        u_logits[0, 0, ban_cols, eos] = -float("inf")
+                        u_logits[0, 0, ban_cols, eos] = _neg
             pred_tokens, scores = _predict_tokens_blockwise(
                 model, c_logits.to(torch.float32), u_logits.to(torch.float32),
                 gen_config,

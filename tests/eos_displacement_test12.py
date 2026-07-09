@@ -6,6 +6,10 @@ import torchaudio.functional as AF
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from omnivoice.models.omnivoice import OmniVoice, OmniVoiceGenerationConfig
 from omnivoice.blockdiff_dual import _decode_block_causal, block_eos_id
+from omnivoice.utils.text import add_punctuation
+def _seam_strip(t):
+    return t.rstrip().rstrip('\u3002.!?\uff01\uff1f;\uff1b,\uff0c\u2026')
+
 import tempfile
 SD='/opt/gpfs/users/yinfeng/work/OmniVoice/download/tts_eval_datasets/seedtts_testset/zh'
 CKPT=os.environ.get('CKPT', 'exp/block_b2/checkpoint-50000')
@@ -21,6 +25,10 @@ if len(UTTS)<N:
         if u not in UTTS: UTTS.append(u)
         if len(UTTS)>=N: break
 UTTS=UTTS[:N]
+_pf=os.environ.get('PROMPT_FILTER')
+if _pf:
+    UTTS=[u for u in UTTS if u in _pf.split(',')]
+    sys.stderr.write('[prompt_filter] UTTS=%s\n'%UTTS)
 mdir=tempfile.mkdtemp(prefix='b2eos_')
 for f in ('model.safetensors','config.json'):
     os.symlink(os.path.abspath(os.path.join(CKPT,f)), os.path.join(mdir,f))
@@ -36,12 +44,19 @@ def prep(utt):
     w=torch.tensor(w,dtype=torch.float32)
     if w.dim()>1: w=w.mean(-1)
     if sr!=tsr: w=AF.resample(w.unsqueeze(0),sr,tsr).squeeze(0)
+    _pad=float(os.environ.get('TAIL_PAD_S','0') or '0')
+    if _pad>0:
+        w=torch.cat([w,torch.zeros(int(_pad*tsr),dtype=w.dtype)])
+        sys.stderr.write('[tail_pad=%.2fs] active\n'%_pad)
     with torch.no_grad():
         enc=tok.encode(w.unsqueeze(0).unsqueeze(0).to(tok.device))
     at=enc.audio_codes if hasattr(enc,'audio_codes') else enc
     if isinstance(at,(list,tuple)): at=at[0]
     ref=at.squeeze()
-    inp=model._prepare_inference_inputs(ttext,32,ptext,ref,'zh',None,False)
+    _seam=os.environ.get('SEAM_PUNCT','default')
+    _ptext=add_punctuation(ptext) if _seam=='on' else (_seam_strip(ptext) if _seam=='strip' else ptext)
+    if _seam!='default': sys.stderr.write('[seam_punct='+_seam+'] active\n')
+    inp=model._prepare_inference_inputs(ttext,32,_ptext,ref,'zh',None,False)
     ii,am=inp['input_ids'],inp['audio_mask']
     if ii.dim()==3: ii=ii[0]
     if am.dim()==2: am=am[0]
