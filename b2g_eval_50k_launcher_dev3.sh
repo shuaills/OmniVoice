@@ -60,6 +60,7 @@ for lang, lname in (("zh", "Chinese"), ("en", "English")):
             if len(p) < 4:
                 continue
             ref = p[2] if os.path.isabs(p[2]) else os.path.join(DL, p[2])
+            if not os.path.exists(ref): ref = ref.replace("/download/", "/download/tts_eval_datasets/", 1)
             w.write(json.dumps({"id": p[0], "ref_text": p[1], "ref_audio": ref,
                                 "text": p[3], "language_id": lang,
                                 "language_name": lname}, ensure_ascii=False) + "\n")
