@@ -43,8 +43,14 @@
 - D2 eager-EOS + 末块静音改写（Tortoise 原型）：EOS 判决后，末块未提交格子写 244 族静音而非任其残差提交。
 
 **第三梯队（训练侧根修，需卡/排期，待拍板）**
-- T1 末段静音监督：语音结束→EOS 窗之间的 label 从"不管"改为真实静音 token —— 根修残差提交 + 给模型合法的静音出口（哼鸣的替代品）。
-- T2 EOS 窗设计复审：以 B2S 100k/200k 生长曲线为判据（病随训练涨 → 4 列窗仍在教先验）。
+- **T1+T2 合并升级：EOS/padding 角色解耦（文本 dLLM 文献同构印证，用户勘察 2026-07-10）**。
+  文献链：-EOS paper（arXiv 2601.22527，LLaDA 类 EOS-padding → EOS Trap：早期 denoise EOS confidence 异常高）；Rainbow Padding（2510.03680，`<eos> overflow` 归因 EOS 双重角色=终止符+空位 placeholder，修法=单 EOS + 循环 pad 分散概率质量）；VoidPadding（2606.17999，[VOID] 专管 padding，EOS 只管 semantic termination）；SSD-2（EOS pad 到 block 边界=工程 trick 非语义）。**我们的 labels[0,T:]=eos（v1 收到 4 列）正是被批判的 dual-role 设计；三表型与 `<eos> overflow` 同构**（文本=短回答/EOS 串，音频=瞬停/哼鸣/尾部残差）。
+  **音频版解耦标签规范（草案，实验臂待拍板）**：
+  1. EOS 只做 stop event：单列（或 ≤2 列鲁棒窗）labels[0,T]=eos。
+  2. T+1 起一个 block 内：全 8 码本监督为**真实静音帧**（音频天然 [VOID]=数据静音族，今晚已测得各码本静音众数：cb0=244、cb1=354、cb4=433、cb6=926、cb7=419/858；用真实静音而非人造 pad token=有数据支撑）。防新吸引子：只监督 T+1..T+32 一个 block，之外 ignore（Rainbow 用循环 pad 防单 token 独大的同款顾虑）。
+  3. 推理契约：首个 EOS 即停、EOS 后格子永不进 vocoder（现 stop_abs 裁切已保证）；EOS 判决从单点 confidence 升级为块内 EOS density/survival（抗噪）。
+  4. 判据：junction-12 = 0/12、fillerometer 哼鸣 <20/100、lead_hum_s 中位 →0、全集 frames<32=0（修复采样器下）、WER/SIM 无回归；对照臂=现 v2 配方同步数。
+- T2' 生长曲线判据仍跑：B2S 100k/200k junction+哼鸣复测（病随训练涨 → dual-role 残留权重定量）。
 - T3 onset 一致性数据卫生：turn 起点 trim 到一致边距（AR 共识）；鉴于数据先验只有 28%，优先级低于 T1/T2。
 - T4 CFG 特殊类旁路（E1 移植）：cb0 的 onset 期 CFG 旁路/降幅，压放大器而非压症状。
 
