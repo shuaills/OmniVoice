@@ -844,3 +844,8 @@ R∈[0,16) ≈ 40%,R∈[24,32) = 20.1%,R≥28 = 14.1%。**数据习惯不可能�
 **② 主树合入（用户拍板"cleanup 一波，进 main"）**：commit **300bf06** = seed_rem 修复（gen_frame_positions helper + jr>=n_pre guard）+ finfo 有限 pre-CFG ban + 5 回归测试（主树跑通）+ DUMP_TOKENS_DIR/PROMPT_FILTER/TAIL_PAD_S 探针工具。清理不进 main：ONSET_BAN（no-op）、SEAM_PUNCT（探针专用）。安全扫描：全库唯一 pre-combine ban 点即此处（blockdiff.py 各 -inf 均为 combine 后，安全）。**GPU 冒烟：主树 6-utt 生成与探针分支 token 逐字节一致 6/6** —— 主树 = 探针分支行为完全等价，已推 ysgit。B2S 训练进程不受影响（模块已加载；重启后 import 新代码训练语义零变化）。
 
 **通宵总账**：三 bug（fp32 注意力 6.5×训练加速 / seed_rem 计数 / CFG NaN）；修后 B2G first-100 WER 0.23%、口癖 0/100、哼鸣 4/100；B2S first-100 WER 16.50%、口癖 0/100、哼鸣 3/100；主表待全集 re-eval 正式化（rescue 拼接 zh 3.83/en 7.06 已是下界）。真实残余问题清单见凌晨 II 条目 ⑤。
+
+## 2026-07-10 晨 — 尾部怪声法证（10002905-00000006）+ NaN 版全集 re-eval 提交
+
+- **用户耳测"乐器声/电视消音声"尾部伪影 token 级定罪**：频谱=末 0.2s 出现 ~785Hz 纯音（谐波度 0.91-0.95，近正弦）；token（确定性同种子重生成+dump）：cb0 尾部 = 语音内容 → **真静音 244 连跑 8 帧**（cb1/cb6 同步静音族）→ **最后 6 帧翻成 830/798 重复 token = 蜂鸣**，EOS 随后。即：模型已正确到达干净静音，末块 EOS 前的无监督格子又被并行去掩码填了音调性 token —— **残差提交表型的修后确认版**（非数据音乐泄漏：静音先到了，junk 是后填的）。同事说"正常"半对：是本解码设计的已知伪影类（Tortoise "harsh end BLAH" 同病，calm-token 重写即其修法），根修=EOS 解耦设计的静音监督段。新数据清洗照做但不解此题。
+- **NaN 版全集 re-eval 已提交**（用户批准）：job shuai-b2g-eval-nanfix @ queue-rtx4090-2n 8×4090（gpu6 整机空闲），b2g_eval_nanfix_launcher.sh（RES=results_b2g_50k_nanfix，whisper --batch-size 4），主树修复采样器。预计 1-2h（4090 vs H100 折减）。
