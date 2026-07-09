@@ -93,6 +93,16 @@ def build_block_causal_attn_mask(
     return (same_doc & (ok | pad_q)).unsqueeze(0).unsqueeze(0)
 
 
+# Steady-state HiggsAudioV2 encoding of digital silence, one token per
+# codebook (measured 2026-07-10 on 1.0s of zeros through the production
+# tokenizer, first 2 edge frames excluded). Upper residual codebooks dither
+# within a small silence family; any member is an acceptable target and they
+# carry the lowest codebook loss weights.
+SILENCE_FRAME_TOKENS = torch.tensor(
+    [244, 354, 998, 351, 433, 552, 926, 419], dtype=torch.long
+)
+
+
 # ---------------------------------------------------------------------------
 # Training-side processor (two-copy layout)
 # ---------------------------------------------------------------------------
@@ -102,7 +112,9 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
     """Official conditioning draws + two-copy block-causal sample layout."""
 
     def __init__(self, *args, block_size: int = 32,
-                 turn_boundary_prompt_prob: float = 0.0, **kwargs):
+                 turn_boundary_prompt_prob: float = 0.0,
+                 eos_decouple_silence: bool = False,
+                 silence_void_window: int = 32, **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
             raise ValueError(f"block_size must be positive, got {block_size}")
@@ -115,6 +127,9 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         # model misreads that junction as utterance end (instant EOS / silence
         # onset, B2F-10k verdict 2026-07-08).
         self.turn_boundary_prompt_prob = turn_boundary_prompt_prob
+        # EOS/padding decoupling (see TrainingConfig.eos_decouple_silence).
+        self.eos_decouple_silence = eos_decouple_silence
+        self.silence_void_window = silence_void_window
 
     def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         # --- official draw order (verbatim; global mask_ratio draw is kept
@@ -223,8 +238,25 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         # (30.6% first-block truncation) or, when EOS-banned, a displaced
         # silence run (the universal onset hum). Verified 2026-07-07:
         # tests/eos_displacement_test.py (ban=0 -> 3/4 instant EOS).
-        eos_window = 4
-        noisy_labels[0, T:min(T + eos_window, canvas_len)] = eos
+        if self.eos_decouple_silence:
+            # Decoupled roles: [eos] is a single stop EVENT at T (not a
+            # region), and the void T+1..T+1+window is supervised as the
+            # real silence frame on every codebook. The void must have a
+            # defined, data-real value or parallel demasking commits junk
+            # there at inference (tail beep between end-of-speech and EOS).
+            sil = SILENCE_FRAME_TOKENS
+            if C > sil.numel():
+                raise ValueError(
+                    f"SILENCE_FRAME_TOKENS covers {sil.numel()} codebooks, "
+                    f"got C={C}"
+                )
+            noisy_labels[0, T] = eos
+            v_hi = min(T + 1 + self.silence_void_window, canvas_len)
+            if v_hi > T + 1:
+                noisy_labels[:, T + 1:v_hi] = sil[:C].unsqueeze(1)
+        else:
+            eos_window = 4
+            noisy_labels[0, T:min(T + eos_window, canvas_len)] = eos
 
         if drop_text:
             P = 0

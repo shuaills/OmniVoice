@@ -275,6 +275,10 @@ def build_dataloaders(
                 turn_boundary_prompt_prob=getattr(
                     config, "turn_boundary_prompt_prob", 0.0
                 ),
+                eos_decouple_silence=getattr(
+                    config, "eos_decouple_silence", False
+                ),
+                silence_void_window=getattr(config, "silence_void_window", 32),
             )
         else:
             from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor

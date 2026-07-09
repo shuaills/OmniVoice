@@ -77,6 +77,16 @@ class TrainingConfig:
     # "single" = B1 right-truncation (attention untouched);
     # "dual"   = B2 two-copy block-causal attention (flex_attention only).
     block_scheme: str = "single"
+    # EOS/padding role decoupling (DESIGN_junction_eos_battle.md; Rainbow
+    # Padding / VoidPadding isomorphism). When enabled, the [eos] label
+    # shrinks to a single stop-event column at content end T, and the canvas
+    # void T+1..T+1+silence_void_window is supervised as the real
+    # digital-silence frame on ALL codebooks, so the posterior between
+    # end-of-speech and canvas end prefers silence over residual junk
+    # (tail-beep pathology, RESULTS 2026-07-10). Only meaningful with
+    # block_scheme="dual".
+    eos_decouple_silence: bool = False
+    silence_void_window: int = 32
     # Drop samples whose transcript has an utterance-edge disfluency filler
     # (zh/ja/ko leading, en leading+trailing). See omnivoice/data/edge_filler_filter.py.
     filter_edge_fillers: bool = False
