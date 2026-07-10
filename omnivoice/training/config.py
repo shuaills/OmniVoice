@@ -132,6 +132,13 @@ class TrainingConfig:
     perf_torch_compile: bool = False
     perf_compile_mode: str = "default"
     perf_compile_dynamic: bool = True
+    # Enables HF gradient checkpointing on the LLM backbone (activation
+    # recompute in backward). Capacity lever for long-form training.
+    perf_grad_checkpoint: bool = False
+    # Disables KV-cache construction in training forwards (use_cache=False
+    # on the backbone). Training never consumes the cache; building it is
+    # pure waste. Kept flag-gated for clean A/B attribution.
+    perf_train_no_cache: bool = False
 
     # System
     mixed_precision: str = "bf16"

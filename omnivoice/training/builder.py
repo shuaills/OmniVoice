@@ -127,6 +127,16 @@ def build_model_and_tokenizer(
         model._perf_mask_buffers = True
         logger.info("PERF: persistent mask buffers enabled")
 
+    if config.perf_train_no_cache:
+        model.llm.config.use_cache = False
+        logger.info("PERF: training-forward KV cache disabled")
+
+    if config.perf_grad_checkpoint:
+        model.llm.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
+        logger.info("PERF: gradient checkpointing enabled (use_reentrant=False)")
+
     if config.perf_flex_bf16_qkv:
         # ROOT-CAUSE FIX (16x anomaly): under accelerate bf16 mixed precision
         # with fp32 master weights, transformers-5.3 Qwen3 feeds flex
