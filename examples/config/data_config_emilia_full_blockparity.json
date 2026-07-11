@@ -1,0 +1,44 @@
+{
+  "train": [
+    {
+      "language_id": "en",
+      "manifest_path": [
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk000/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk001/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk002/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk003/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk004/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk005/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk006/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk007/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk008/data.lst"
+      ],
+      "repeat": 1
+    },
+    {
+      "language_id": "zh",
+      "manifest_path": [
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk000/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk001/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk002/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk003/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk004/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk005/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk006/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk007/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk008/data.lst",
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/zh_chunk009/data.lst"
+      ],
+      "repeat": 1
+    }
+  ],
+  "dev": [
+    {
+      "language_id": "en",
+      "manifest_path": [
+        "/opt/gpfs/users/shuai/work/block-longform/OmniVoice/data/emilia_full/tokens/en_chunk009/data.lst"
+      ],
+      "repeat": 1
+    }
+  ]
+}
