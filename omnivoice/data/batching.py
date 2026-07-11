@@ -30,6 +30,8 @@ Key classes:
 
 import bisect
 import logging
+
+logger = logging.getLogger(__name__)
 from typing import Any, Dict, Iterator, List, Optional
 
 import numpy as np
@@ -241,6 +243,12 @@ class PackingIterableDataset(WrappedIterableDataset):
             sample_length = processed_sample["length"]
 
             if sample_length > self.batch_tokens:
+                self.dropped_overlong = getattr(self, "dropped_overlong", 0) + 1
+                if self.dropped_overlong % 100 == 1:
+                    logger.warning(
+                        f"packer dropped overlong sample #{self.dropped_overlong} "
+                        f"(length={sample_length} > batch_tokens={self.batch_tokens})"
+                    )
                 continue
 
             # Check if adding this sample exceeds the batch token limit

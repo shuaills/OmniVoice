@@ -205,4 +205,12 @@ class PackingDataCollator:
             return_list["copy_tags"] = copy_tags.unsqueeze(0)  # [1, L]
             return_list["block_ids"] = block_ids.unsqueeze(0)  # [1, L]
 
+        if all("loss_kind" in s for s in processed_samples):
+            loss_kind = torch.cat([s["loss_kind"] for s in processed_samples], dim=1)
+            # pad value 0 == KIND_IGNORE: padding must never be supervised
+            loss_kind = torch.nn.functional.pad(
+                loss_kind, pad=(0, pad_length), value=0
+            )
+            return_list["loss_kind"] = loss_kind.unsqueeze(0)  # [1, C, L]
+
         return return_list

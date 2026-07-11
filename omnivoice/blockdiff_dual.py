@@ -98,6 +98,30 @@ def build_block_causal_attn_mask(
 # tokenizer, first 2 edge frames excluded). Upper residual codebooks dither
 # within a small silence family; any member is an acceptable target and they
 # carry the lowest codebook loss weights.
+# Supervision-kind codes (loss contract v2): why a cell is supervised,
+# never inferable from token value (silence frames occur as real content).
+KIND_IGNORE = 0
+KIND_ACOUSTIC = 1
+KIND_EOS = 2
+KIND_VOID = 3
+
+
+def build_loss_kind(noisy_labels, T, canvas_len, eos_decouple, v_hi, eos_window=4):
+    """Pure derivation of loss_kind for the noisy copy. Consumes NO RNG:
+    every input is an already-computed tensor/int. IGNORE stays 0."""
+    C = noisy_labels.shape[0]
+    kind = torch.zeros((C, canvas_len), dtype=torch.uint8)
+    content = noisy_labels[:, :T] != -100
+    kind[:, :T][content] = KIND_ACOUSTIC
+    if eos_decouple:
+        kind[0, T] = KIND_EOS
+        if v_hi > T + 1:
+            kind[:, T + 1:v_hi] = KIND_VOID
+    else:
+        kind[0, T:min(T + eos_window, canvas_len)] = KIND_EOS
+    return kind
+
+
 SILENCE_FRAME_TOKENS = torch.tensor(
     [244, 354, 998, 351, 433, 552, 926, 419], dtype=torch.long
 )
@@ -258,6 +282,12 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             eos_window = 4
             noisy_labels[0, T:min(T + eos_window, canvas_len)] = eos
 
+        _v_hi = (min(T + 1 + self.silence_void_window, canvas_len)
+                 if self.eos_decouple_silence else T + 1)
+        kind_noisy = build_loss_kind(
+            noisy_labels, T, canvas_len, self.eos_decouple_silence, _v_hi
+        )
+
         if drop_text:
             P = 0
             input_ids = torch.cat([clean_copy, noisy_copy], dim=1)
@@ -304,6 +334,17 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             ]
         )
 
+        loss_kind = torch.cat(
+            [
+                torch.zeros((C, P), dtype=torch.uint8),
+                torch.zeros((C, clean_len), dtype=torch.uint8),
+                kind_noisy,
+            ],
+            dim=1,
+        )
+        if (loss_kind == KIND_IGNORE) .ne(labels == -100).any():
+            raise AssertionError("loss_kind invariant violated: IGNORE <-> label==-100")
+
         return {
             "input_ids": input_ids,
             "labels": labels,
@@ -312,6 +353,7 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             "position_ids": position_ids,
             "copy_tag": copy_tag,
             "block_idx": block_idx,
+            "loss_kind": loss_kind,
         }
 
 
