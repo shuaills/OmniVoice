@@ -1,0 +1,21 @@
+{
+  "fingerprint": {
+    "git_commit": "c29f0d1499e69e0c770c52cca896d4c0d7ad06b0",
+    "train_config": "examples/config/train_config_scratch_qwen3-0.6b_eosdecouple_500k.json",
+    "config_md5": "a6caeb0a70f4f262ae7392688174f04a",
+    "seed": 42,
+    "batch_tokens": 20480,
+    "torch": "2.8.0+cu128"
+  },
+  "num_packs": 2000,
+  "E_beta_a": 0.9677734657448621,
+  "E_beta_e": 0.0004104790408789893,
+  "E_beta_v": 0.03181605521425888,
+  "std_beta_a": 0.021082205482399054,
+  "std_beta_e": 0.00024941387464498115,
+  "std_beta_v": 0.020853795111940066,
+  "gamma": 0.9677734657448621,
+  "lambda_eos": 0.00042414785629926076,
+  "lambda_void": 0.03287551926190821,
+  "dropped_overlong": 258
+}

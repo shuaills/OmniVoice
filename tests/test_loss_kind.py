@@ -106,3 +106,31 @@ def test_collate_padding_is_ignore():
     assert (lk[:, total:] == KIND_IGNORE).all()
     lab = out["labels"][0]
     assert torch.equal(lk == KIND_IGNORE, lab == -100)
+
+
+def test_collate_mixed_presence_raises():
+    import types
+
+    from omnivoice.data.collator import PackingDataCollator
+
+    labels, T, canvas, v_hi = _mk_noisy_labels(seed=0)
+    kind = build_loss_kind(labels, T, canvas, True, v_hi)
+    C, L = labels.shape
+    base = {
+        "input_ids": torch.zeros((C, L), dtype=torch.long),
+        "labels": labels,
+        "audio_mask": torch.ones(L, dtype=torch.bool),
+        "length": L,
+        "position_ids": torch.arange(L),
+        "copy_tag": torch.zeros(L, dtype=torch.int32),
+        "block_idx": torch.zeros(L, dtype=torch.int32),
+    }
+    with_kind = dict(base, loss_kind=kind)
+    stub = types.SimpleNamespace(text_tokenizer=types.SimpleNamespace(pad_token_id=0))
+    collator = PackingDataCollator(processor=stub, batch_tokens=2 * L + 5)
+    try:
+        collator([with_kind, dict(base)])
+    except AssertionError as e:
+        assert "mixed loss_kind" in str(e)
+    else:
+        raise AssertionError("mixed presence did not raise")

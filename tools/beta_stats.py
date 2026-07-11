@@ -43,6 +43,11 @@ def main():
     args = ap.parse_args()
 
     config = TrainingConfig.from_json(args.train_config)
+    if not getattr(config, "eos_decouple_silence", False):
+        raise SystemExit(
+            "beta_stats only accepts decoupled baselines "
+            "(exactly-one-EOS assertion is undefined for legacy 4-col labels)"
+        )
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
@@ -71,7 +76,28 @@ def main():
         "seed": config.seed,
         "batch_tokens": config.batch_tokens,
         "torch": torch.__version__,
+        "measurement_num_workers": 0,
+        "source_num_workers": config.num_workers,
+        "data_config_md5": hashlib.md5(
+            open(config.data_config, "rb").read()
+        ).hexdigest(),
+        "resolved_llm_path": _resolve_model_path(config.llm_name_or_path),
+        "numpy": np.__version__,
+        "transformers": __import__("transformers").__version__,
+        "webdataset": getattr(__import__("webdataset"), "__version__", "unknown"),
     }
+    import json as _json
+    _dc = _json.load(open(config.data_config))
+    manifest_paths = sorted(
+        m for grp in _dc.get("train", []) for m in grp["manifest_path"]
+    )
+    fingerprint["manifest_fingerprint"] = hashlib.md5(
+        "".join(
+            f"{m}:{hashlib.md5(open(m, 'rb').read()).hexdigest()}"
+            for m in manifest_paths
+        ).encode()
+    ).hexdigest()
+    fingerprint["num_manifests"] = len(manifest_paths)
 
     packs = []
     betas_a, betas_e, betas_v = [], [], []

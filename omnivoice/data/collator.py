@@ -205,7 +205,13 @@ class PackingDataCollator:
             return_list["copy_tags"] = copy_tags.unsqueeze(0)  # [1, L]
             return_list["block_ids"] = block_ids.unsqueeze(0)  # [1, L]
 
-        if all("loss_kind" in s for s in processed_samples):
+        _has_kind = ["loss_kind" in s for s in processed_samples]
+        if any(_has_kind) and not all(_has_kind):
+            raise AssertionError(
+                "mixed loss_kind presence in one pack: "
+                f"{sum(_has_kind)}/{len(_has_kind)} samples carry it"
+            )
+        if all(_has_kind):
             loss_kind = torch.cat([s["loss_kind"] for s in processed_samples], dim=1)
             # pad value 0 == KIND_IGNORE: padding must never be supervised
             loss_kind = torch.nn.functional.pad(
