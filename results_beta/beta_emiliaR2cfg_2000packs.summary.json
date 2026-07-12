@@ -1,0 +1,30 @@
+{
+  "fingerprint": {
+    "git_commit": "8664118ea08aea4dd619a4467f19674129158d8c",
+    "train_config": "examples/config/train_config_emilia_blockparity_300k.json",
+    "config_md5": "a656410b637707a9639efb0bf482766e",
+    "seed": 42,
+    "batch_tokens": 15648,
+    "torch": "2.8.0+cu128",
+    "measurement_num_workers": 0,
+    "source_num_workers": 4,
+    "data_config_md5": "8361a31c09ef4ffb4fe5223dfd278bc6",
+    "resolved_llm_path": "/opt/gpfs/models/Qwen3-0.6B",
+    "numpy": "2.4.3",
+    "transformers": "5.3.0",
+    "webdataset": "1.0.2",
+    "manifest_fingerprint": "74b43876c0a0f43da4c54f5b7bbf2569",
+    "num_manifests": 19
+  },
+  "num_packs": 2000,
+  "E_beta_a": 0.871818328227301,
+  "E_beta_e": 0.0016254605557549527,
+  "E_beta_v": 0.12655621121694408,
+  "std_beta_a": 0.016937647382420932,
+  "std_beta_e": 0.00015916734084008577,
+  "std_beta_v": 0.01684457230669646,
+  "gamma": 0.871818328227301,
+  "lambda_eos": 0.0018644487080927274,
+  "lambda_void": 0.14516351299275307,
+  "dropped_overlong": 0
+}
