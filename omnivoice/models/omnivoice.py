@@ -188,6 +188,14 @@ class GenerationTask:
 class OmniVoiceModelOutput(ModelOutput):
     loss: Optional[torch.Tensor] = None
     logits: Optional[torch.Tensor] = None
+    audio_sum: Optional[torch.Tensor] = None
+    eos_sum: Optional[torch.Tensor] = None
+    void_event_sum: Optional[torch.Tensor] = None
+    audio_count: Optional[torch.Tensor] = None
+    eos_count: Optional[torch.Tensor] = None
+    void_count: Optional[torch.Tensor] = None
+    void_events: Optional[torch.Tensor] = None
+    legacy_loss: Optional[torch.Tensor] = None
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +433,7 @@ class OmniVoice(PreTrainedModel):
         loss_weights: Optional[torch.Tensor] = None,
         copy_tags: Optional[torch.Tensor] = None,
         block_ids: Optional[torch.Tensor] = None,
+        loss_kind: Optional[torch.Tensor] = None,
     ):
 
         inputs_embeds = self._prepare_embed_inputs(input_ids, audio_mask)
@@ -571,9 +580,59 @@ class OmniVoice(PreTrainedModel):
             )
             loss = (layer_means * weights).sum()
 
+        split_numerators = None
+        split_counts = None
+        legacy_loss = None
+        if getattr(self, "_split_loss", False):
+            if labels is None:
+                raise ValueError("split loss requires labels")
+            if loss_kind is None:
+                raise ValueError("split loss requires loss_kind")
+            if document_ids is None:
+                raise ValueError("split loss requires document_ids")
+            if loss_weights is not None:
+                raise ValueError(
+                    "split loss is undefined with per-cell loss_weights"
+                )
+            from omnivoice.training.split_loss import (
+                category_counts,
+                split_loss_numerators,
+            )
+
+            split_numerators = split_loss_numerators(
+                per_token_loss,
+                loss_kind,
+                document_ids,
+                weights,
+            )
+            split_counts = category_counts(loss_kind, document_ids)
+            legacy_loss = loss.detach()
+
         return OmniVoiceModelOutput(
-            loss=loss,
+            loss=legacy_loss if split_numerators is not None else loss,
             logits=audio_logits,
+            audio_sum=(
+                split_numerators.audio_sum if split_numerators is not None else None
+            ),
+            eos_sum=(
+                split_numerators.eos_sum if split_numerators is not None else None
+            ),
+            void_event_sum=(
+                split_numerators.void_event_sum
+                if split_numerators is not None
+                else None
+            ),
+            audio_count=(
+                split_counts.audio_count if split_counts is not None else None
+            ),
+            eos_count=(split_counts.eos_count if split_counts is not None else None),
+            void_count=(
+                split_counts.void_count if split_counts is not None else None
+            ),
+            void_events=(
+                split_counts.void_events if split_counts is not None else None
+            ),
+            legacy_loss=legacy_loss,
         )
 
     def supported_language_ids(self) -> set[str]:

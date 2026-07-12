@@ -31,6 +31,8 @@ from datetime import timedelta
 from typing import Any, Optional
 
 import torch
+import torch.distributed as dist
+import accelerate
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.utils import DeepSpeedPlugin, InitProcessGroupKwargs, set_seed
 from torch.utils.data import DataLoader
@@ -41,6 +43,12 @@ from transformers import (
 
 from omnivoice.training.checkpoint import TrainLogger, load_checkpoint
 from omnivoice.training.checkpoint import save_checkpoint as engine_save_checkpoint
+from omnivoice.training.split_loss import (
+    SplitLossNumerators,
+    WindowCoordinator,
+    backward_scalar,
+    objective_from_global_sums,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +80,16 @@ class OmniTrainer:
 
         # 1. Initialize Accelerator
         self.accelerator = self._init_accelerator()
+        if self.config.split_loss:
+            distributed_type = getattr(
+                self.accelerator.distributed_type,
+                "name",
+                str(self.accelerator.distributed_type),
+            ).upper()
+            if distributed_type in {"DEEPSPEED", "FSDP"}:
+                raise RuntimeError(
+                    f"split loss is not derived for {distributed_type}; refusing to run"
+                )
 
         # 2. Setup Optimizer & Scheduler if not provided
         if optimizer is None:
@@ -211,6 +229,11 @@ class OmniTrainer:
         """Evaluation loop."""
         if self.eval_dataloader is None:
             return {}
+        if self.config.split_loss:
+            raise RuntimeError(
+                "split-loss evaluation requires globally normalized eval windows; "
+                "legacy local-mean evaluation is intentionally disabled"
+            )
 
         self.model.eval()
         logger.info(f"Running evaluation at step {self.global_step}...")
@@ -243,6 +266,8 @@ class OmniTrainer:
 
     def train(self):
         """Main training loop."""
+        if self.config.split_loss:
+            return self._train_split()
         logger.info("Starting Training Loop...")
 
         # Resume if configured
@@ -363,6 +388,251 @@ class OmniTrainer:
                         self.save_checkpoint(self.global_step)
 
         # Final Save
+        self.save_checkpoint(self.global_step)
+        train_logger.close()
+        self.accelerator.end_training()
+
+    def _reduce_split_numerators(
+        self, numerators: SplitLossNumerators
+    ) -> SplitLossNumerators:
+        vector = torch.cat(
+            (
+                numerators.audio_sum.detach().reshape(-1),
+                numerators.eos_sum.detach().reshape(1),
+                numerators.void_event_sum.detach().reshape(1),
+            )
+        ).to(device=self.accelerator.device, dtype=torch.float64)
+        if dist.is_available() and dist.is_initialized():
+            dist.all_reduce(vector, op=dist.ReduceOp.SUM)
+        num_codebooks = numerators.audio_sum.numel()
+        return SplitLossNumerators(
+            audio_sum=vector[:num_codebooks],
+            eos_sum=vector[num_codebooks],
+            void_event_sum=vector[num_codebooks + 1],
+        )
+
+    def _train_split(self):
+        """Train with globally normalized acoustic/EOS/void loss windows."""
+
+        logger.info("Starting split-loss Training Loop...")
+        world_size = self.accelerator.num_processes
+        ga_steps = self.accelerator.gradient_accumulation_steps
+        if ga_steps != self.config.gradient_accumulation_steps:
+            raise RuntimeError(
+                "Accelerate/config gradient accumulation mismatch: "
+                f"{ga_steps} != {self.config.gradient_accumulation_steps}"
+            )
+        logger.info(
+            "Split-loss runtime: torch=%s accelerate=%s W=%d G=%d",
+            torch.__version__,
+            accelerate.__version__,
+            world_size,
+            ga_steps,
+        )
+
+        if self.config.resume_from_checkpoint:
+            self.load_checkpoint(self.config.resume_from_checkpoint)
+            if getattr(self.config, "force_lr_from_config_on_resume", False):
+                base = self.config.learning_rate
+                inner = self.lr_scheduler
+                while hasattr(inner, "scheduler"):
+                    inner = inner.scheduler
+                inner.base_lrs = [base] * len(inner.base_lrs)
+                lam = inner.lr_lambdas[0](inner.last_epoch)
+                for group in self.optimizer.param_groups:
+                    group["initial_lr"] = base
+                    group["lr"] = base * lam
+                logger.info(
+                    "force_lr_from_config_on_resume: base_lr=%s, "
+                    "lr at resumed step %s = %.3e",
+                    base,
+                    inner.last_epoch,
+                    base * lam,
+                )
+
+        if hasattr(self.train_dataloader.dataset, "set_epoch"):
+            self.train_dataloader.dataset.set_epoch(self.epoch)
+        coordinator = WindowCoordinator(
+            self.train_dataloader,
+            ga_steps,
+            epoch=self.epoch,
+            collective_device=self.accelerator.device,
+        )
+        train_logger = TrainLogger(
+            self.accelerator, self.config.steps, self.config.logging_steps
+        )
+        train_logger.start(self.global_step)
+        self.model.train()
+
+        normalized_weights = torch.tensor(
+            self.accelerator.unwrap_model(
+                self.model
+            ).normalized_audio_codebook_weights,
+            device=self.accelerator.device,
+            dtype=torch.float64,
+        )
+        logging_start_time = time.time()
+        logging_start_step = self.global_step
+        interval = {"loss": 0.0, "audio": 0.0, "eos": 0.0, "void": 0.0}
+        interval_audio_counts = [0.0] * normalized_weights.numel()
+        interval_void_counts = [0.0] * normalized_weights.numel()
+        interval_eos_events = 0.0
+        interval_void_events = 0.0
+
+        while self.global_step < self.config.steps:
+            previous_epoch = self.epoch
+            window = coordinator.next_window()
+            self.epoch = window.epoch
+            if self.epoch != previous_epoch:
+                logger.info("Epoch %d starting. Resetting dataloader...", self.epoch)
+
+            local_audio_sum = None
+            local_eos_sum = None
+            local_void_sum = None
+            grad_norm = 0.0
+
+            for microbatch_index, cpu_batch in enumerate(window.batches):
+                batch = _to_device(cpu_batch, self.accelerator.device)
+                with self.accelerator.accumulate(self.model):
+                    outputs = self.model(**batch)
+                    if any(
+                        value is None
+                        for value in (
+                            outputs.audio_sum,
+                            outputs.eos_sum,
+                            outputs.void_event_sum,
+                            outputs.audio_count,
+                            outputs.eos_count,
+                            outputs.void_count,
+                            outputs.void_events,
+                        )
+                    ):
+                        raise RuntimeError(
+                            "model did not return complete split-loss outputs"
+                        )
+                    numerators = SplitLossNumerators(
+                        audio_sum=outputs.audio_sum,
+                        eos_sum=outputs.eos_sum,
+                        void_event_sum=outputs.void_event_sum,
+                    )
+                    loss_for_backward = backward_scalar(
+                        numerators,
+                        window.global_counts,
+                        normalized_weights,
+                        gamma=self.config.split_gamma,
+                        lambda_eos=self.config.lambda_eos,
+                        lambda_void=self.config.lambda_void,
+                        world_size=world_size,
+                        gradient_accumulation_steps=ga_steps,
+                    )
+
+                    expected_sync = microbatch_index == ga_steps - 1
+                    if self.accelerator.sync_gradients != expected_sync:
+                        raise RuntimeError(
+                            "Accelerate sync_gradients violated the exact GA window: "
+                            f"microbatch={microbatch_index}, G={ga_steps}, "
+                            f"sync_gradients={self.accelerator.sync_gradients}"
+                        )
+                    self.accelerator.backward(loss_for_backward)
+
+                    detached_audio = outputs.audio_sum.detach().to(torch.float64)
+                    detached_eos = outputs.eos_sum.detach().to(torch.float64)
+                    detached_void = outputs.void_event_sum.detach().to(torch.float64)
+                    if local_audio_sum is None:
+                        local_audio_sum = torch.zeros_like(detached_audio)
+                        local_eos_sum = torch.zeros_like(detached_eos)
+                        local_void_sum = torch.zeros_like(detached_void)
+                    local_audio_sum += detached_audio
+                    local_eos_sum += detached_eos
+                    local_void_sum += detached_void
+
+                    if expected_sync:
+                        if self.config.max_grad_norm > 0:
+                            grad_norm = self.accelerator.clip_grad_norm_(
+                                self.model.parameters(), self.config.max_grad_norm
+                            )
+                            grad_norm = (
+                                grad_norm.item() if grad_norm is not None else 0.0
+                            )
+                        self.optimizer.step()
+                        self.lr_scheduler.step()
+                        self.optimizer.zero_grad()
+                        self.global_step += 1
+
+            global_numerators = self._reduce_split_numerators(
+                SplitLossNumerators(
+                    audio_sum=local_audio_sum,
+                    eos_sum=local_eos_sum,
+                    void_event_sum=local_void_sum,
+                )
+            )
+            global_loss, audio_loss, eos_loss, void_loss = objective_from_global_sums(
+                global_numerators,
+                window.global_counts,
+                normalized_weights,
+                gamma=self.config.split_gamma,
+                lambda_eos=self.config.lambda_eos,
+                lambda_void=self.config.lambda_void,
+            )
+            metrics = {
+                "loss": float(global_loss.item()),
+                "audio": float(audio_loss.item()),
+                "eos": float(eos_loss.item()),
+                "void": float(void_loss.item()),
+            }
+            for key, value in metrics.items():
+                interval[key] += value
+            for codebook, count in enumerate(window.global_counts.audio_count.tolist()):
+                interval_audio_counts[codebook] += float(count)
+            for codebook, count in enumerate(window.global_counts.void_count.tolist()):
+                interval_void_counts[codebook] += float(count)
+            interval_eos_events += float(window.global_counts.eos_count.item())
+            interval_void_events += float(window.global_counts.void_events.item())
+
+            current_lr = self.lr_scheduler.get_last_lr()[0]
+            train_logger.update(
+                step=self.global_step, loss=metrics["loss"], lr=current_lr
+            )
+            if self.global_step % self.config.logging_steps == 0:
+                elapsed = time.time() - logging_start_time
+                completed = self.global_step - logging_start_step
+                divisor = float(completed)
+                logs = {
+                    "train/loss": interval["loss"] / divisor,
+                    "train/audio_loss": interval["audio"] / divisor,
+                    "train/eos_loss": interval["eos"] / divisor,
+                    "train/void_loss": interval["void"] / divisor,
+                    "train/learning_rate": current_lr,
+                    "train/grad_norm": grad_norm,
+                    "train/epoch": self.epoch,
+                    "train/steps_per_sec": completed / elapsed if elapsed > 0 else 0.0,
+                    "train/eos_events": interval_eos_events / divisor,
+                    "train/void_events": interval_void_events / divisor,
+                }
+                for codebook in range(normalized_weights.numel()):
+                    logs[f"train/audio_cells_c{codebook}"] = (
+                        interval_audio_counts[codebook] / divisor
+                    )
+                    logs[f"train/void_cells_c{codebook}"] = (
+                        interval_void_counts[codebook] / divisor
+                    )
+                train_logger.log_metrics(step=self.global_step, metrics=logs)
+                interval = {"loss": 0.0, "audio": 0.0, "eos": 0.0, "void": 0.0}
+                interval_audio_counts = [0.0] * normalized_weights.numel()
+                interval_void_counts = [0.0] * normalized_weights.numel()
+                interval_eos_events = 0.0
+                interval_void_events = 0.0
+                logging_start_time = time.time()
+                logging_start_step = self.global_step
+
+            if (
+                self.eval_dataloader is not None
+                and self.global_step % self.config.eval_steps == 0
+            ):
+                self.evaluate()
+            if self.global_step % self.config.save_steps == 0:
+                self.save_checkpoint(self.global_step)
+
         self.save_checkpoint(self.global_step)
         train_logger.close()
         self.accelerator.end_training()

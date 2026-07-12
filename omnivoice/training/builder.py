@@ -33,6 +33,7 @@ Key functions:
 """
 
 import logging
+import math
 from functools import partial
 from typing import Tuple
 
@@ -228,6 +229,40 @@ def build_model_and_tokenizer(
             dynamic=config.perf_compile_dynamic,
         )
         model.config.llm_config.vocab_size = len(tokenizer)
+
+    if config.split_loss:
+        if not config.block_training or config.block_scheme != "dual":
+            raise ValueError(
+                "split_loss requires block_training with block_scheme='dual'"
+            )
+        if not config.eos_decouple_silence:
+            raise ValueError("split_loss requires eos_decouple_silence=True")
+        if config.attn_implementation != "flex_attention":
+            raise ValueError("split_loss requires flex_attention packing")
+        if config.elastic:
+            raise ValueError("split_loss is undefined with elastic loss_weights")
+        coefficients = {
+            "split_gamma": config.split_gamma,
+            "lambda_eos": config.lambda_eos,
+            "lambda_void": config.lambda_void,
+        }
+        if not math.isfinite(config.split_gamma) or config.split_gamma <= 0:
+            raise ValueError("split_gamma must be finite and > 0")
+        if any(
+            not math.isfinite(value) or value < 0
+            for name, value in coefficients.items()
+            if name != "split_gamma"
+        ):
+            raise ValueError("split-loss lambdas must be finite and >= 0")
+        model._split_loss = True
+        logger.info(
+            "Split loss enabled (gamma=%s, lambda_eos=%s, lambda_void=%s)",
+            config.split_gamma,
+            config.lambda_eos,
+            config.lambda_void,
+        )
+    else:
+        model._split_loss = False
 
     # 4. Config IDs
     model.config.pad_token_id = tokenizer.pad_token_id

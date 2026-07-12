@@ -94,6 +94,13 @@ class TrainingConfig:
     # (needs 'turns' in labels; internal dataset has them). See blockdiff_dual.
     turn_boundary_prompt_prob: float = 0.0
 
+    # Independently normalized acoustic/EOS/void objective.  Coefficients are
+    # neutral defaults; production recipes must carry their measured values.
+    split_loss: bool = False
+    split_gamma: float = 1.0
+    lambda_eos: float = 1.0
+    lambda_void: float = 1.0
+
     # Init settings
     resume_from_checkpoint: Optional[str] = None
     # On resume, re-force the LR envelope from this config: checkpoint
