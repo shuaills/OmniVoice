@@ -1,0 +1,6 @@
+R3 provenance: 2026-07-12T22:23:25Z
+git: 659f63fe17fb7b087e1b010cc370cd63e5d349c7 dirty=[]
+620f43b38ced478135f19f062f2f496f5a5d471c5dee249af0b8f8f3b55fd80f  examples/config/train_config_emilia_splitloss_300k.json
+000ad8ebfb26e40511b87f503794768a3581800784192f56bfa94ac6832733c2  examples/config/data_config_emilia_full_blockparity.json
+GPU 0: NVIDIA H100 80GB HBM3 (UUID: GPU-1f94cc8f-27a8-1049-8d02-6ffc23414c43)
+2.8.0+cu128 1.13.0 5.3.0

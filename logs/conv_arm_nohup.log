@@ -1,0 +1,7 @@
+nohup: ignoring input
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+vocab 1025 -> 1026, C=8
+migrated checkpoint written to exp/r1final_migrated_block
+07/13/2026 08:52:59 - INFO - omnivoice.training.checkpoint - Saved checkpoint to exp/blockcausal_splitloss_conv50k_from_r1final/checkpoint-50000
+Training: 100%|██████████| 50000/50000 [6:07:55<00:00,  2.26it/s, loss=3.8709, lr=0.00e+00]
+CONV_ARM_EXITED rc=0

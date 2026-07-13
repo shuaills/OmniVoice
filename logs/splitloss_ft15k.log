@@ -1,0 +1,442 @@
+The following values were not passed to `accelerate launch` and had defaults used instead:
+		More than one GPU was found, enabling multi-GPU training.
+		If this was unintended please pass in `--num_processes=1`.
+	`--num_machines` was set to a value of `1`
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6349.14it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5867.37it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6394.60it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 4953.22it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 7187.73it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6011.92it/s]
+Loading weights:   0%|          | 0/313 [00:00<?, ?it/s]Loading weights: 100%|██████████| 313/313 [00:00<00:00, 5575.33it/s]
+Loading weights: 100%|██████████| 313/313 [00:00<00:00, 6043.72it/s]
+07/13/2026 02:43:53 - INFO - omnivoice.training.trainer - Loaded Config: TrainingConfig(output_dir='exp/blockcausal_splitloss_ft15k_from_r2final', data_config='examples/config/data_config_emilia_full_blockparity.json', llm_name_or_path='/opt/gpfs/models/Qwen3-0.6B', audio_vocab_size=1026, audio_mask_id=1024, num_audio_codebook=8, audio_codebook_weights=[8, 8, 6, 6, 4, 4, 2, 2], drop_cond_ratio=0.1, prompt_ratio_range=[0.0, 0.3], mask_ratio_range=[0.0, 1.0], language_ratio=0.0, use_pinyin_ratio=0.0, instruct_ratio=0.0, only_instruct_ratio=0.0, elastic=False, p_elastic=0.5, elastic_merge_prob=0.08, elastic_insert_prob=0.04, elastic_end_append_max_ratio=0.25, elastic_mode='legacy', elastic_delta_max=0.3, elastic_mid_insert_frac=0.3, elastic_scheduler_mix=0.5, block_training=True, block_size=32, block_scheme='dual', eos_decouple_silence=True, silence_void_window=32, filter_edge_fillers=False, turn_boundary_prompt_prob=0.0, split_loss=True, split_gamma=0.8718, lambda_eos=0.001864, lambda_void=0.14516, resume_from_checkpoint=None, force_lr_from_config_on_resume=False, init_from_checkpoint='/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/exp/init_shim_r2final', learning_rate=3e-05, weight_decay=0.01, max_grad_norm=1.0, steps=15000, seed=42, lr_scheduler_type='constant', warmup_type='steps', warmup_ratio=0.0, warmup_steps=200, batch_tokens=15648, gradient_accumulation_steps=1, num_workers=4, perf_blockmask_cache=False, perf_liger=True, perf_fused_adamw=True, perf_mask_buffers=False, perf_compile_skip_attn=False, perf_flex_bf16_qkv=True, perf_balanced_packing=0, perf_torch_compile=False, perf_compile_mode='default', perf_compile_dynamic=True, perf_grad_checkpoint=True, perf_train_no_cache=True, mixed_precision='bf16', allow_tf32=True, use_deepspeed=False, deepspeed_config=None, attn_implementation='flex_attention', max_sample_tokens=2000, min_sample_tokens=50, max_batch_size=64, logging_steps=50, eval_steps=1000000000, save_steps=5000, keep_last_n_checkpoints=3)
+07/13/2026 02:43:57 - INFO - omnivoice.training.trainer - Starting split-loss Training Loop...
+07/13/2026 02:43:57 - INFO - omnivoice.training.trainer - Split-loss runtime: torch=2.8.0+cu128 accelerate=1.13.0 W=8 G=1
+Training:   0%|          | 0/15000 [00:00<?, ?it/s][rank1]: Traceback (most recent call last):
+[rank1]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank1]:   File "<frozen runpy>", line 88, in _run_code
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank1]:     main()
+[rank1]:     ~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank1]:     trainer.train()
+[rank1]:     ~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/trainer.py", line 270, in train
+[rank1]:     return self._train_split()
+[rank1]:            ~~~~~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/trainer.py", line 497, in _train_split
+[rank1]:     outputs = self.model(**batch)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank1]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank1]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank1]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank1]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank1]:     return model_forward(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank1]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank1]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank1]:     return func(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/models/omnivoice.py", line 534, in forward
+[rank1]:     llm_outputs = self.llm(
+[rank1]:         inputs_embeds=inputs_embeds,
+[rank1]:     ...<2 lines>...
+[rank1]:         position_ids=position_ids,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank1]:     output = func(self, *args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank1]:     outputs = func(self, *args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank1]:     hidden_states = decoder_layer(
+[rank1]:         hidden_states,
+[rank1]:     ...<6 lines>...
+[rank1]:         **kwargs,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 92, in __call__
+[rank1]:     return self._gradient_checkpointing_func(partial(super().__call__, **kwargs), *args)
+[rank1]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_compile.py", line 53, in inner
+[rank1]:     return disable_fn(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_dynamo/eval_frame.py", line 929, in _fn
+[rank1]:     return fn(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/utils/checkpoint.py", line 495, in checkpoint
+[rank1]:     ret = function(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank1]:     hidden_states, _ = self.self_attn(
+[rank1]:                        ~~~~~~~~~~~~~~^
+[rank1]:         hidden_states=hidden_states,
+[rank1]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:     ...<6 lines>...
+[rank1]:         **kwargs,
+[rank1]:         ^^^^^^^^^
+[rank1]:     )
+[rank1]:     ^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 280, in forward
+[rank1]:     attn_output, attn_weights = attention_interface(
+[rank1]:                                 ~~~~~~~~~~~~~~~~~~~^
+[rank1]:         self,
+[rank1]:         ^^^^^
+[rank1]:     ...<7 lines>...
+[rank1]:         **kwargs,
+[rank1]:         ^^^^^^^^^
+[rank1]:     )
+[rank1]:     ^
+[rank1]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/builder.py", line 156, in _bf16_flex
+[rank1]:     return _orig_flex(
+[rank1]:         module,
+[rank1]:     ...<5 lines>...
+[rank1]:         **kw2,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/integrations/flex_attention.py", line 290, in flex_attention_forward
+[rank1]:     flex_attention_output = compile_friendly_flex_attention(
+[rank1]:         query,
+[rank1]:     ...<10 lines>...
+[rank1]:         training=module.training,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/integrations/flex_attention.py", line 97, in compile_friendly_flex_attention
+[rank1]:     return flex_attention_compiled(
+[rank1]:         query,
+[rank1]:     ...<2 lines>...
+[rank1]:         **kwargs,
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_dynamo/eval_frame.py", line 749, in compile_wrapper
+[rank1]:     raise e.remove_dynamo_frames() from None  # see TORCHDYNAMO_VERBOSE=1
+[rank1]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 923, in _compile_fx_inner
+[rank1]:     raise InductorError(e, currentframe()).with_traceback(
+[rank1]:         e.__traceback__
+[rank1]:     ) from None
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 907, in _compile_fx_inner
+[rank1]:     mb_compiled_graph = fx_codegen_and_compile(
+[rank1]:         gm, example_inputs, inputs_to_check, **graph_kwargs
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 1578, in fx_codegen_and_compile
+[rank1]:     return scheme.codegen_and_compile(gm, example_inputs, inputs_to_check, graph_kwargs)
+[rank1]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 1456, in codegen_and_compile
+[rank1]:     compiled_module = graph.compile_to_module()
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2293, in compile_to_module
+[rank1]:     return self._compile_to_module()
+[rank1]:            ~~~~~~~~~~~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2303, in _compile_to_module
+[rank1]:     mod = self._compile_to_module_lines(wrapper_code)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2371, in _compile_to_module_lines
+[rank1]:     mod = PyCodeCache.load_by_key_path(
+[rank1]:         key,
+[rank1]:     ...<2 lines>...
+[rank1]:         attrs={**self.constants, **self.torchbind_constants},
+[rank1]:     )
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/codecache.py", line 3296, in load_by_key_path
+[rank1]:     mod = _reload_python_module(key, path, set_sys_modules=in_toplevel)
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/compile_tasks.py", line 31, in _reload_python_module
+[rank1]:     exec(code, mod.__dict__, mod.__dict__)
+[rank1]:     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/tmp/torchinductor_root/wo/cwoxrkkdxhijmypsplzfmmjmigt4zfcnqhltpepifwk7hvjksmt2.py", line 612, in <module>
+[rank1]:     async_compile.wait(globals())
+[rank1]:     ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 491, in wait
+[rank1]:     self._wait_futures(scope)
+[rank1]:     ~~~~~~~~~~~~~~~~~~^^^^^^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 511, in _wait_futures
+[rank1]:     kernel = result.result()
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/codecache.py", line 4014, in result
+[rank1]:     return self.result_fn()
+[rank1]:            ~~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 376, in get_result
+[rank1]:     kernel.precompile(
+[rank1]:     ~~~~~~~~~~~~~~~~~^
+[rank1]:         warm_cache_only=False,
+[rank1]:         ^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:         reload_kernel=reload_kernel_in_parent,
+[rank1]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:         static_triton_bundle_key=CompiledTritonKernels.key(source_code),
+[rank1]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:     )
+[rank1]:     ^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/triton_heuristics.py", line 411, in precompile
+[rank1]:     self._make_launchers()
+[rank1]:     ~~~~~~~~~~~~~~~~~~~~^^
+[rank1]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/triton_heuristics.py", line 573, in _make_launchers
+[rank1]:     raise RuntimeError(f"No valid triton configs. {type(exc).__name__}: {exc}")
+[rank1]: torch._inductor.exc.InductorError: RuntimeError: No valid triton configs. OutOfMemoryError: out of resource: triton_tem_fused_0 Required: 107008 Hardware limit:101376 Reducing block sizes or `num_stages` may help.
+
+[rank1]: Set TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS="+dynamo"
+
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "<frozen runpy>", line 198, in _run_module_as_main
+[rank5]:   File "<frozen runpy>", line 88, in _run_code
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/cli/train.py", line 74, in <module>
+[rank5]:     main()
+[rank5]:     ~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/cli/train.py", line 70, in main
+[rank5]:     trainer.train()
+[rank5]:     ~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/trainer.py", line 270, in train
+[rank5]:     return self._train_split()
+[rank5]:            ~~~~~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/trainer.py", line 497, in _train_split
+[rank5]:     outputs = self.model(**batch)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1648, in forward
+[rank5]:     else self._run_ddp_forward(*inputs, **kwargs)
+[rank5]:          ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/parallel/distributed.py", line 1474, in _run_ddp_forward
+[rank5]:     return self.module(*inputs, **kwargs)  # type: ignore[index]
+[rank5]:            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 823, in forward
+[rank5]:     return model_forward(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/utils/operations.py", line 811, in __call__
+[rank5]:     return convert_to_fp32(self.model_forward(*args, **kwargs))
+[rank5]:                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/amp/autocast_mode.py", line 44, in decorate_autocast
+[rank5]:     return func(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/models/omnivoice.py", line 534, in forward
+[rank5]:     llm_outputs = self.llm(
+[rank5]:         inputs_embeds=inputs_embeds,
+[rank5]:     ...<2 lines>...
+[rank5]:         position_ids=position_ids,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 917, in wrapper
+[rank5]:     output = func(self, *args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 253, in wrapper
+[rank5]:     outputs = func(self, *args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 436, in forward
+[rank5]:     hidden_states = decoder_layer(
+[rank5]:         hidden_states,
+[rank5]:     ...<6 lines>...
+[rank5]:         **kwargs,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 92, in __call__
+[rank5]:     return self._gradient_checkpointing_func(partial(super().__call__, **kwargs), *args)
+[rank5]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_compile.py", line 53, in inner
+[rank5]:     return disable_fn(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_dynamo/eval_frame.py", line 929, in _fn
+[rank5]:     return fn(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/utils/checkpoint.py", line 495, in checkpoint
+[rank5]:     ret = function(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 323, in forward
+[rank5]:     hidden_states, _ = self.self_attn(
+[rank5]:                        ~~~~~~~~~~~~~~^
+[rank5]:         hidden_states=hidden_states,
+[rank5]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:     ...<6 lines>...
+[rank5]:         **kwargs,
+[rank5]:         ^^^^^^^^^
+[rank5]:     )
+[rank5]:     ^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+[rank5]:     return self._call_impl(*args, **kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+[rank5]:     return forward_call(*args, **kwargs)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 280, in forward
+[rank5]:     attn_output, attn_weights = attention_interface(
+[rank5]:                                 ~~~~~~~~~~~~~~~~~~~^
+[rank5]:         self,
+[rank5]:         ^^^^^
+[rank5]:     ...<7 lines>...
+[rank5]:         **kwargs,
+[rank5]:         ^^^^^^^^^
+[rank5]:     )
+[rank5]:     ^
+[rank5]:   File "/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/omnivoice/training/builder.py", line 156, in _bf16_flex
+[rank5]:     return _orig_flex(
+[rank5]:         module,
+[rank5]:     ...<5 lines>...
+[rank5]:         **kw2,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/integrations/flex_attention.py", line 290, in flex_attention_forward
+[rank5]:     flex_attention_output = compile_friendly_flex_attention(
+[rank5]:         query,
+[rank5]:     ...<10 lines>...
+[rank5]:         training=module.training,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/transformers/integrations/flex_attention.py", line 97, in compile_friendly_flex_attention
+[rank5]:     return flex_attention_compiled(
+[rank5]:         query,
+[rank5]:     ...<2 lines>...
+[rank5]:         **kwargs,
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_dynamo/eval_frame.py", line 749, in compile_wrapper
+[rank5]:     raise e.remove_dynamo_frames() from None  # see TORCHDYNAMO_VERBOSE=1
+[rank5]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 923, in _compile_fx_inner
+[rank5]:     raise InductorError(e, currentframe()).with_traceback(
+[rank5]:         e.__traceback__
+[rank5]:     ) from None
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 907, in _compile_fx_inner
+[rank5]:     mb_compiled_graph = fx_codegen_and_compile(
+[rank5]:         gm, example_inputs, inputs_to_check, **graph_kwargs
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 1578, in fx_codegen_and_compile
+[rank5]:     return scheme.codegen_and_compile(gm, example_inputs, inputs_to_check, graph_kwargs)
+[rank5]:            ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/compile_fx.py", line 1456, in codegen_and_compile
+[rank5]:     compiled_module = graph.compile_to_module()
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2293, in compile_to_module
+[rank5]:     return self._compile_to_module()
+[rank5]:            ~~~~~~~~~~~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2303, in _compile_to_module
+[rank5]:     mod = self._compile_to_module_lines(wrapper_code)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/graph.py", line 2371, in _compile_to_module_lines
+[rank5]:     mod = PyCodeCache.load_by_key_path(
+[rank5]:         key,
+[rank5]:     ...<2 lines>...
+[rank5]:         attrs={**self.constants, **self.torchbind_constants},
+[rank5]:     )
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/codecache.py", line 3296, in load_by_key_path
+[rank5]:     mod = _reload_python_module(key, path, set_sys_modules=in_toplevel)
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/compile_tasks.py", line 31, in _reload_python_module
+[rank5]:     exec(code, mod.__dict__, mod.__dict__)
+[rank5]:     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/tmp/torchinductor_root/li/cli5ddl3ebd6jbm6crgpneo3bhska6a6hurr7kysfmrz7cmbgkgw.py", line 612, in <module>
+[rank5]:     async_compile.wait(globals())
+[rank5]:     ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 491, in wait
+[rank5]:     self._wait_futures(scope)
+[rank5]:     ~~~~~~~~~~~~~~~~~~^^^^^^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 511, in _wait_futures
+[rank5]:     kernel = result.result()
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/codecache.py", line 4014, in result
+[rank5]:     return self.result_fn()
+[rank5]:            ~~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/async_compile.py", line 376, in get_result
+[rank5]:     kernel.precompile(
+[rank5]:     ~~~~~~~~~~~~~~~~~^
+[rank5]:         warm_cache_only=False,
+[rank5]:         ^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:         reload_kernel=reload_kernel_in_parent,
+[rank5]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:         static_triton_bundle_key=CompiledTritonKernels.key(source_code),
+[rank5]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:     )
+[rank5]:     ^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/triton_heuristics.py", line 411, in precompile
+[rank5]:     self._make_launchers()
+[rank5]:     ~~~~~~~~~~~~~~~~~~~~^^
+[rank5]:   File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/_inductor/runtime/triton_heuristics.py", line 573, in _make_launchers
+[rank5]:     raise RuntimeError(f"No valid triton configs. {type(exc).__name__}: {exc}")
+[rank5]: torch._inductor.exc.InductorError: RuntimeError: No valid triton configs. OutOfMemoryError: out of resource: triton_tem_fused_0 Required: 107008 Hardware limit:101376 Reducing block sizes or `num_stages` may help.
+
+[rank5]: Set TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS="+dynamo"
+
+W0713 02:44:56.894000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442970 closing signal SIGTERM
+W0713 02:44:56.898000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442972 closing signal SIGTERM
+W0713 02:44:56.906000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442973 closing signal SIGTERM
+W0713 02:44:56.913000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442974 closing signal SIGTERM
+W0713 02:44:56.932000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442975 closing signal SIGTERM
+W0713 02:44:56.933000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442976 closing signal SIGTERM
+W0713 02:44:56.997000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 442977 closing signal SIGTERM
+E0713 02:44:58.469000 442833 .venv/lib/python3.13/site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 1 (pid: 442971) of binary: /opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/python
+Traceback (most recent call last):
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/bin/accelerate", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/accelerate_cli.py", line 50, in main
+    args.func(args)
+    ~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1396, in launch_command
+    multi_gpu_launcher(args)
+    ~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/accelerate/commands/launch.py", line 1023, in multi_gpu_launcher
+    distrib_run.run(args)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/run.py", line 892, in run
+    elastic_launch(
+    ~~~~~~~~~~~~~~~
+        config=config,
+        ~~~~~~~~~~~~~~
+        entrypoint=cmd,
+        ~~~~~~~~~~~~~~~
+    )(*cmd_args)
+    ~^^^^^^^^^^^
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 143, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/opt/gpfs/home/yinfeng/work/OmniVoice/.venv/lib/python3.13/site-packages/torch/distributed/launcher/api.py", line 277, in launch_agent
+    raise ChildFailedError(
+    ...<2 lines>...
+    )
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+omnivoice.cli.train FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-07-13_02:44:56
+  host      : shuai-longform-dev-worker-0.shuai-longform-dev.devpod3.svc.cluster.local
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 442971)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
