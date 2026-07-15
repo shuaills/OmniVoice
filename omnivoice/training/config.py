@@ -86,6 +86,10 @@ class TrainingConfig:
     # (tail-beep pathology, RESULTS 2026-07-10). Only meaningful with
     # block_scheme="dual".
     eos_decouple_silence: bool = False
+    # Number of consecutive cb0 EOS targets beginning at the first frame after
+    # content.  The band is one independently-normalized event; k=1 preserves
+    # the original point-EOS recipe exactly.
+    eos_band_k: int = 1
     silence_void_window: int = 32
     # Drop samples whose transcript has an utterance-edge disfluency filler
     # (zh/ja/ko leading, en leading+trailing). See omnivoice/data/edge_filler_filter.py.

@@ -115,6 +115,86 @@ def test_zero_void_is_graph_connected():
     assert torch.isfinite(losses.grad).all()
 
 
+def test_eos_band_is_one_event_per_document():
+    # doc0 has a two-cell EOS band with mean loss 4; doc1 has a clipped
+    # one-cell band with loss 10.  The global event mean must be (4+10)/2=7,
+    # not the cell mean (2+6+10)/3=6.
+    losses = torch.tensor(
+        [[[2.0, 6.0, 10.0], [0.0, 0.0, 0.0]]], requires_grad=True
+    )
+    kinds = torch.tensor(
+        [
+            [
+                [KIND_EOS, KIND_EOS, KIND_EOS],
+                [KIND_IGNORE, KIND_IGNORE, KIND_IGNORE],
+            ]
+        ],
+        dtype=torch.uint8,
+    )
+    docs = torch.tensor([[0, 0, 1]])
+    weights = torch.tensor([0.75, 0.25])
+    counts = category_counts(kinds, docs)
+    numerators = split_loss_numerators(
+        losses, kinds, docs, weights, eos_band_k=4
+    )
+    assert counts.eos_count.item() == 2
+    # One extra EOS column displaced one would-be void cell on each codebook.
+    assert counts.void_displaced.item() == 2
+    assert numerators.eos_sum.item() == 14.0
+    scalar = backward_scalar(
+        numerators,
+        counts,
+        weights,
+        gamma=1.0,
+        lambda_eos=1.0,
+        lambda_void=0.0,
+        world_size=1,
+        gradient_accumulation_steps=1,
+    )
+    assert scalar.item() == 7.0
+    scalar.backward()
+    assert torch.equal(
+        losses.grad[0, 0], torch.tensor([0.25, 0.25, 0.5])
+    )
+
+
+def test_eos_band_k1_preserves_point_reduction_bitwise():
+    values = torch.tensor(
+        [[[1.25, 2.5, 3.75, 5.0], [7.0, 8.0, 9.0, 10.0]]],
+        requires_grad=True,
+    )
+    kinds = torch.tensor(
+        [
+            [
+                [KIND_ACOUSTIC, KIND_EOS, KIND_ACOUSTIC, KIND_EOS],
+                [KIND_IGNORE, KIND_IGNORE, KIND_IGNORE, KIND_IGNORE],
+            ]
+        ],
+        dtype=torch.uint8,
+    )
+    docs = torch.tensor([[0, 0, 1, 1]])
+    weights = torch.tensor([0.75, 0.25])
+    expected_values = values.detach().clone().requires_grad_(True)
+    expected = (expected_values * (kinds == KIND_EOS)).sum()
+    actual = split_loss_numerators(
+        values, kinds, docs, weights, eos_band_k=1
+    ).eos_sum
+    assert torch.equal(actual, expected)
+    actual.backward()
+    expected.backward()
+    assert torch.equal(values.grad, expected_values.grad)
+
+
+def test_disjoint_eos_cells_are_not_one_band():
+    kinds = torch.tensor(
+        [[[KIND_EOS, KIND_IGNORE, KIND_EOS], [KIND_IGNORE] * 3]],
+        dtype=torch.uint8,
+    )
+    counts = category_counts(kinds, torch.tensor([[0, 0, 0]]))
+    assert counts.eos_count.item() == 1
+    assert counts.invariant_errors.item() == 1
+
+
 def test_single_category_pack_and_zero_audio_codebook():
     losses = torch.tensor([[[2.0, 4.0], [100.0, 200.0]]], requires_grad=True)
     kinds = torch.tensor(
@@ -152,6 +232,7 @@ def test_zero_eos_fails_fast():
         eos_count=torch.tensor(0),
         void_count=torch.tensor([0]),
         void_events=torch.tensor(0),
+        void_displaced=torch.tensor(0),
         invariant_errors=torch.tensor(0),
     )
     try:

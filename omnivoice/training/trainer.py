@@ -478,6 +478,7 @@ class OmniTrainer:
         interval_void_counts = [0.0] * normalized_weights.numel()
         interval_eos_events = 0.0
         interval_void_events = 0.0
+        interval_void_displaced = 0.0
 
         while self.global_step < self.config.steps:
             previous_epoch = self.epoch
@@ -588,6 +589,9 @@ class OmniTrainer:
                 interval_void_counts[codebook] += float(count)
             interval_eos_events += float(window.global_counts.eos_count.item())
             interval_void_events += float(window.global_counts.void_events.item())
+            interval_void_displaced += float(
+                window.global_counts.void_displaced.item()
+            )
 
             current_lr = self.lr_scheduler.get_last_lr()[0]
             train_logger.update(
@@ -608,6 +612,9 @@ class OmniTrainer:
                     "train/steps_per_sec": completed / elapsed if elapsed > 0 else 0.0,
                     "train/eos_events": interval_eos_events / divisor,
                     "train/void_events": interval_void_events / divisor,
+                    "train/void_cells_displaced": (
+                        interval_void_displaced / divisor
+                    ),
                 }
                 for codebook in range(normalized_weights.numel()):
                     logs[f"train/audio_cells_c{codebook}"] = (
@@ -622,6 +629,7 @@ class OmniTrainer:
                 interval_void_counts = [0.0] * normalized_weights.numel()
                 interval_eos_events = 0.0
                 interval_void_events = 0.0
+                interval_void_displaced = 0.0
                 logging_start_time = time.time()
                 logging_start_step = self.global_step
 

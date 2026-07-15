@@ -604,6 +604,7 @@ class OmniVoice(PreTrainedModel):
                 loss_kind,
                 document_ids,
                 weights,
+                eos_band_k=getattr(self, "_eos_band_k", 1),
             )
             split_counts = category_counts(loss_kind, document_ids)
             legacy_loss = loss.detach()

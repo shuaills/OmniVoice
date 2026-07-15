@@ -237,6 +237,8 @@ def build_model_and_tokenizer(
             )
         if not config.eos_decouple_silence:
             raise ValueError("split_loss requires eos_decouple_silence=True")
+        if config.eos_band_k < 1:
+            raise ValueError("eos_band_k must be >= 1")
         if config.attn_implementation != "flex_attention":
             raise ValueError("split_loss requires flex_attention packing")
         if config.elastic:
@@ -255,6 +257,7 @@ def build_model_and_tokenizer(
         ):
             raise ValueError("split-loss lambdas must be finite and >= 0")
         model._split_loss = True
+        model._eos_band_k = config.eos_band_k
         logger.info(
             "Split loss enabled (gamma=%s, lambda_eos=%s, lambda_void=%s)",
             config.split_gamma,
@@ -312,7 +315,9 @@ def build_dataloaders(
 
             logger.info(
                 "Block-diffusion DUAL (block-causal) training ENABLED "
-                "(block_size=%s)", config.block_size,
+                "(block_size=%s, eos_band_k=%s)",
+                config.block_size,
+                config.eos_band_k,
             )
             processor = OmniVoiceBlockDualSampleProcessor(
                 **processor_kwargs,
@@ -323,6 +328,7 @@ def build_dataloaders(
                 eos_decouple_silence=getattr(
                     config, "eos_decouple_silence", False
                 ),
+                eos_band_k=getattr(config, "eos_band_k", 1),
                 silence_void_window=getattr(config, "silence_void_window", 32),
             )
         else:

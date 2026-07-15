@@ -38,6 +38,7 @@ class SplitLossCounts:
     eos_count: torch.Tensor
     void_count: torch.Tensor
     void_events: torch.Tensor
+    void_displaced: torch.Tensor
     invariant_errors: torch.Tensor
 
     def stacked(self) -> torch.Tensor:
@@ -47,13 +48,14 @@ class SplitLossCounts:
                 self.eos_count.reshape(1),
                 self.void_count.reshape(-1),
                 self.void_events.reshape(1),
+                self.void_displaced.reshape(1),
                 self.invariant_errors.reshape(1),
             )
         )
 
     @classmethod
     def from_stacked(cls, value: torch.Tensor, num_codebooks: int):
-        expected = 2 * num_codebooks + 3
+        expected = 2 * num_codebooks + 4
         if value.ndim != 1 or value.numel() != expected:
             raise ValueError(
                 f"expected a [{expected}] count vector, got {tuple(value.shape)}"
@@ -62,7 +64,8 @@ class SplitLossCounts:
             audio_count=value[:num_codebooks],
             eos_count=value[num_codebooks],
             void_count=value[num_codebooks + 1 : 2 * num_codebooks + 1],
-            void_events=value[-2],
+            void_events=value[-3],
+            void_displaced=value[-2],
             invariant_errors=value[-1],
         )
 
@@ -128,6 +131,8 @@ def category_counts(
     if document_ids is None:
         raise ValueError("split loss requires document_ids")
     invariant_errors = (loss_kind[:, 1:] == KIND_EOS).sum(dtype=torch.int64)
+    eos_events = torch.zeros((), dtype=torch.int64, device=loss_kind.device)
+    void_displaced = torch.zeros((), dtype=torch.int64, device=loss_kind.device)
     for batch_index in range(loss_kind.shape[0]):
         supervised_positions = (loss_kind[batch_index] != KIND_IGNORE).any(dim=0)
         invariant_errors = invariant_errors + (
@@ -138,10 +143,24 @@ def category_counts(
         if doc_ids.numel() == 0:
             continue
         membership = document_ids[batch_index].unsqueeze(0) == doc_ids.unsqueeze(1)
-        eos_by_doc = (
-            membership & (loss_kind[batch_index, 0] == KIND_EOS).unsqueeze(0)
-        ).sum(dim=1)
-        invariant_errors = invariant_errors + (eos_by_doc != 1).sum(dtype=torch.int64)
+        eos_positions_by_doc = membership & (
+            loss_kind[batch_index, 0] == KIND_EOS
+        ).unsqueeze(0)
+        eos_by_doc = eos_positions_by_doc.sum(dim=1)
+        eos_run_starts = eos_positions_by_doc[:, 0].to(torch.int64)
+        eos_run_starts = eos_run_starts + (
+            eos_positions_by_doc[:, 1:] & ~eos_positions_by_doc[:, :-1]
+        ).sum(dim=1, dtype=torch.int64)
+        docs_with_eos = eos_by_doc > 0
+        invariant_errors = invariant_errors + (eos_run_starts != 1).sum(
+            dtype=torch.int64
+        )
+        eos_events = eos_events + docs_with_eos.sum(dtype=torch.int64)
+        # Relative to point-EOS, every additional EOS column replaces one
+        # would-be void cell on every codebook.  Keep this globally reduced
+        # diagnostic explicit so band width cannot silently alter void dose.
+        extra_eos_columns = (eos_by_doc - 1).clamp(min=0).sum(dtype=torch.int64)
+        void_displaced = void_displaced + extra_eos_columns * loss_kind.shape[1]
         void_by_doc_codebook = (
             membership.unsqueeze(1) & (loss_kind[batch_index] == KIND_VOID).unsqueeze(0)
         ).sum(dim=2)
@@ -150,7 +169,7 @@ def category_counts(
             (void_by_doc_codebook == 0) & docs_with_void.unsqueeze(1)
         ).sum(dtype=torch.int64)
     audio_count = (loss_kind == KIND_ACOUSTIC).sum(dim=(0, 2), dtype=torch.int64)
-    eos_count = (loss_kind == KIND_EOS).sum(dtype=torch.int64)
+    eos_count = eos_events
     void_mask = loss_kind == KIND_VOID
     void_count = void_mask.sum(dim=(0, 2), dtype=torch.int64)
     void_events = _void_event_count(void_mask, document_ids)
@@ -159,6 +178,7 @@ def category_counts(
         eos_count=eos_count.detach(),
         void_count=void_count.detach(),
         void_events=void_events.detach(),
+        void_displaced=void_displaced.detach(),
         invariant_errors=invariant_errors.detach(),
     )
 
@@ -168,6 +188,8 @@ def split_loss_numerators(
     loss_kind: torch.Tensor,
     document_ids: Optional[torch.Tensor],
     normalized_codebook_weights: torch.Tensor,
+    *,
+    eos_band_k: int = 1,
 ) -> SplitLossNumerators:
     """Build differentiable local numerators for the three loss terms."""
 
@@ -190,12 +212,38 @@ def split_loss_numerators(
     eos_mask = loss_kind == KIND_EOS
     void_mask = loss_kind == KIND_VOID
     audio_sum = (per_token_loss * audio_mask).sum(dim=(0, 2))
+    if eos_band_k < 1:
+        raise ValueError(f"eos_band_k must be >= 1, got {eos_band_k}")
+    # Keep the exact historical reduction for point-EOS.  Besides avoiding a
+    # per-step device sync to infer band width, this is the k=1 bit-identity
+    # gate: the old expression and reduction order remain untouched.
     eos_sum = (per_token_loss * eos_mask).sum()
+    if document_ids is None:
+        raise ValueError("split loss requires document_ids")
+    if eos_band_k > 1:
+        # Graph-connected zero before accumulating one band mean per document:
+        # k_s cells remain one stop event, including canvas-edge truncation.
+        eos_sum = per_token_loss.sum() * 0.0
+        for batch_index in range(loss_kind.shape[0]):
+            eos_positions = eos_mask[batch_index, 0]
+            doc_ids = torch.unique(document_ids[batch_index, eos_positions])
+            doc_ids = doc_ids[doc_ids >= 0]
+            if doc_ids.numel() == 0:
+                continue
+            membership = (
+                document_ids[batch_index].unsqueeze(0) == doc_ids.unsqueeze(1)
+            )
+            doc_eos = membership & eos_positions.unsqueeze(0)
+            counts = doc_eos.sum(dim=1)
+            sums = (
+                per_token_loss[batch_index, 0].unsqueeze(0) * doc_eos
+            ).sum(dim=1)
+            eos_sum = eos_sum + (
+                sums / counts.clamp(min=1).to(per_token_loss.dtype)
+            ).sum()
 
     # Graph-connected zero for the globally-zero-void case.
     void_event_sum = per_token_loss.sum() * 0.0
-    if document_ids is None:
-        raise ValueError("split loss requires document_ids")
     for batch_index in range(loss_kind.shape[0]):
         supervised_positions = void_mask[batch_index].any(dim=0)
         doc_ids = torch.unique(document_ids[batch_index, supervised_positions])

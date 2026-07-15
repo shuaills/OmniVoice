@@ -33,7 +33,7 @@ is inherited unchanged from omnivoice.blockdiff.
 
 import math
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import torch
 
@@ -106,17 +106,28 @@ KIND_EOS = 2
 KIND_VOID = 3
 
 
-def build_loss_kind(noisy_labels, T, canvas_len, eos_decouple, v_hi, eos_window=4):
+def build_loss_kind(
+    noisy_labels,
+    T,
+    canvas_len,
+    eos_decouple,
+    v_hi,
+    eos_window=4,
+    eos_band_k=1,
+):
     """Pure derivation of loss_kind for the noisy copy. Consumes NO RNG:
     every input is an already-computed tensor/int. IGNORE stays 0."""
+    if eos_band_k < 1:
+        raise ValueError(f"eos_band_k must be >= 1, got {eos_band_k}")
     C = noisy_labels.shape[0]
     kind = torch.zeros((C, canvas_len), dtype=torch.uint8)
     content = noisy_labels[:, :T] != -100
     kind[:, :T][content] = KIND_ACOUSTIC
     if eos_decouple:
-        kind[0, T] = KIND_EOS
-        if v_hi > T + 1:
-            kind[:, T + 1:v_hi] = KIND_VOID
+        eos_hi = min(T + eos_band_k, canvas_len)
+        kind[0, T:eos_hi] = KIND_EOS
+        if v_hi > eos_hi:
+            kind[:, eos_hi:v_hi] = KIND_VOID
     else:
         kind[0, T:min(T + eos_window, canvas_len)] = KIND_EOS
     return kind
@@ -138,6 +149,7 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
     def __init__(self, *args, block_size: int = 32,
                  turn_boundary_prompt_prob: float = 0.0,
                  eos_decouple_silence: bool = False,
+                 eos_band_k: int = 1,
                  silence_void_window: int = 32, **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
@@ -153,6 +165,13 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         self.turn_boundary_prompt_prob = turn_boundary_prompt_prob
         # EOS/padding decoupling (see TrainingConfig.eos_decouple_silence).
         self.eos_decouple_silence = eos_decouple_silence
+        if eos_band_k < 1:
+            raise ValueError(f"eos_band_k must be >= 1, got {eos_band_k}")
+        if not eos_decouple_silence and eos_band_k != 1:
+            raise ValueError(
+                "eos_band_k != 1 requires eos_decouple_silence=True"
+            )
+        self.eos_band_k = eos_band_k
         self.silence_void_window = silence_void_window
 
     def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
@@ -240,6 +259,14 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
 
         noisy_copy = torch.full((C, canvas_len), self.audio_mask_id, dtype=torch.long)
         noisy_copy[:, :T] = audio_tokens
+        eos_band_k = getattr(self, "eos_band_k", 1)
+        eos_hi = min(T + eos_band_k, canvas_len)
+        if self.eos_decouple_silence:
+            # Terminal inputs have always been hard-masked in this processor.
+            # Keep the whole EOS band in that single atomic state: introducing
+            # an independent Bernoulli per cell would leak clean EOS siblings,
+            # while introducing a new shared draw would break k=1 RNG parity.
+            noisy_copy[:, T:eos_hi] = self.audio_mask_id
         noisy_labels = torch.full((C, canvas_len), -100, dtype=torch.long)
         for b in range(n_blocks):
             lo, hi = b * bs, min((b + 1) * bs, T)
@@ -263,9 +290,10 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         # silence run (the universal onset hum). Verified 2026-07-07:
         # tests/eos_displacement_test.py (ban=0 -> 3/4 instant EOS).
         if self.eos_decouple_silence:
-            # Decoupled roles: [eos] is a single stop EVENT at T (not a
-            # region), and the void T+1..T+1+window is supervised as the
-            # real silence frame on every codebook. The void must have a
+            # Decoupled roles: [eos] is one stop EVENT beginning at T.  It may
+            # occupy a short, atomically-masked band, normalized as one event
+            # by split_loss.  Void starts after the band and is supervised as
+            # the real silence frame on every codebook. The void must have a
             # defined, data-real value or parallel demasking commits junk
             # there at inference (tail beep between end-of-speech and EOS).
             sil = SILENCE_FRAME_TOKENS
@@ -274,18 +302,23 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                     f"SILENCE_FRAME_TOKENS covers {sil.numel()} codebooks, "
                     f"got C={C}"
                 )
-            noisy_labels[0, T] = eos
-            v_hi = min(T + 1 + self.silence_void_window, canvas_len)
-            if v_hi > T + 1:
-                noisy_labels[:, T + 1:v_hi] = sil[:C].unsqueeze(1)
+            noisy_labels[0, T:eos_hi] = eos
+            v_hi = min(eos_hi + self.silence_void_window, canvas_len)
+            if v_hi > eos_hi:
+                noisy_labels[:, eos_hi:v_hi] = sil[:C].unsqueeze(1)
         else:
             eos_window = 4
             noisy_labels[0, T:min(T + eos_window, canvas_len)] = eos
 
-        _v_hi = (min(T + 1 + self.silence_void_window, canvas_len)
+        _v_hi = (min(eos_hi + self.silence_void_window, canvas_len)
                  if self.eos_decouple_silence else T + 1)
         kind_noisy = build_loss_kind(
-            noisy_labels, T, canvas_len, self.eos_decouple_silence, _v_hi
+            noisy_labels,
+            T,
+            canvas_len,
+            self.eos_decouple_silence,
+            _v_hi,
+            eos_band_k=eos_band_k,
         )
 
         if drop_text:
