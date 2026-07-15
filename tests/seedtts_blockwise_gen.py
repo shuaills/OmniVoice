@@ -121,11 +121,15 @@ for k, row in enumerate(rows):
             am = am[0]
         a0 = ii.size(1) - int(am.sum())
         prefix = ii[:, :a0]
+        min_gen_frames = max(
+            8,
+            int(0.3 * model._estimate_target_tokens(ttext, None, None)),
+        )
         toks, stats = _decode_block_causal(
             model, prefix, gen, block_size=bs, max_blocks=args.max_blocks,
             num_step_per_block=args.steps_per_block, use_kv_cache=True,
             seed_audio=ref_toks,
-            min_gen_frames=max(8, int(0.3 * model._estimate_target_tokens(ttext, None, None))),
+            min_gen_frames=min_gen_frames,
             silence_run_frames=silence_run_frames,
             silence_match_codebooks=args.silence_match_codebooks)
         _dd = os.environ.get('DUMP_TOKENS_DIR')
@@ -147,6 +151,9 @@ for k, row in enumerate(rows):
                                  'silence_col': stats['silence_col'],
                                  'silence_trigger_col': stats['silence_trigger_col'],
                                  'silence_run_frames': silence_run_frames,
+                                 'silence_match_codebooks': args.silence_match_codebooks,
+                                 'min_gen_frames': min_gen_frames,
+                                 'seed_frames': ref_toks.size(1),
                                  'n_blocks': stats['n_blocks']}, ensure_ascii=False) + '\n')
     except Exception as e:
         failed += 1
