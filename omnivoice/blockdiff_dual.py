@@ -33,7 +33,7 @@ is inherited unchanged from omnivoice.blockdiff.
 
 import math
 import random
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 
@@ -458,6 +458,93 @@ def gen_frame_positions(committed_len, seed_total, bs, device):
     return committed_len - seed_total + jr, jr
 
 
+def _find_silence_run_start(
+    audio_tokens: torch.Tensor,
+    min_run_frames: int,
+    *,
+    match_codebooks: int = 2,
+    start_frame: int = 0,
+) -> Optional[int]:
+    """Return the earliest qualifying digital-silence run, or ``None``.
+
+    Only the leading ``match_codebooks`` are compared.  The steady-state
+    silence probe is stable in the coarse codebooks, while the upper residual
+    codebooks legitimately dither within a small silence family.  Requiring a
+    full eight-codebook match would therefore miss real quiet tails.
+
+    ``start_frame`` excludes the minimum-generation region from consideration;
+    callers can safely trim at the returned index without violating that guard.
+    """
+    if audio_tokens.ndim != 2:
+        raise ValueError(
+            f"audio_tokens must have shape [C,T], got {tuple(audio_tokens.shape)}"
+        )
+    if min_run_frames < 1:
+        raise ValueError(f"min_run_frames must be >= 1, got {min_run_frames}")
+    if not 1 <= match_codebooks <= audio_tokens.shape[0]:
+        raise ValueError(
+            "match_codebooks must be in [1, C], got "
+            f"{match_codebooks} for C={audio_tokens.shape[0]}"
+        )
+    if match_codebooks > SILENCE_FRAME_TOKENS.numel():
+        raise ValueError(
+            f"silence reference covers {SILENCE_FRAME_TOKENS.numel()} codebooks, "
+            f"got match_codebooks={match_codebooks}"
+        )
+
+    start_frame = max(0, int(start_frame))
+    if audio_tokens.shape[1] - start_frame < min_run_frames:
+        return None
+    reference = SILENCE_FRAME_TOKENS[:match_codebooks].to(
+        device=audio_tokens.device, dtype=audio_tokens.dtype
+    )
+    matches = (
+        audio_tokens[:match_codebooks, start_frame:]
+        == reference.unsqueeze(1)
+    ).all(dim=0)
+    qualifying = matches.unfold(0, min_run_frames, 1).all(dim=1)
+    hits = qualifying.nonzero(as_tuple=True)[0]
+    if hits.numel() == 0:
+        return None
+    return start_frame + int(hits[0])
+
+
+def _choose_termination(
+    eos_col: Optional[int],
+    silence_run_start: Optional[int],
+    silence_run_frames: int,
+) -> Tuple[Optional[str], Optional[int], Optional[int]]:
+    """Choose the first observed stop signal.
+
+    Returns ``(reason, trim_col, trigger_col)`` in generated-frame coordinates.
+    An EOS is both observed and trimmed at its own column.  A silence stop is
+    observed only after the final frame of the qualifying run, but trims back
+    to the run's start so the verified waiting gap is not returned as audio.
+    EOS wins ties: if it appears by the time the silence threshold is reached,
+    the model terminated normally and the fallback did not fire.
+    """
+    if silence_run_frames < 1 and silence_run_start is not None:
+        raise ValueError(
+            "silence_run_frames must be >= 1 when silence_run_start is set"
+        )
+
+    candidates = []
+    if eos_col is not None:
+        eos_col = int(eos_col)
+        candidates.append((eos_col, 0, "eos", eos_col))
+    if silence_run_start is not None:
+        silence_run_start = int(silence_run_start)
+        silence_trigger = silence_run_start + silence_run_frames - 1
+        candidates.append(
+            (silence_trigger, 1, "silence", silence_run_start)
+        )
+    if not candidates:
+        return None, None, None
+
+    trigger_col, _, reason, trim_col = min(candidates)
+    return reason, trim_col, trigger_col
+
+
 @torch.no_grad()
 def _decode_block_causal(
     model,
@@ -470,6 +557,8 @@ def _decode_block_causal(
     logit_trace: Optional[list] = None,
     seed_audio: Optional[torch.Tensor] = None,
     min_gen_frames: int = 0,
+    silence_run_frames: int = 0,
+    silence_match_codebooks: int = 2,
 ):
     """Block-causal decode.  Returns (generated [C, G], stats).
 
@@ -533,7 +622,25 @@ def _decode_block_causal(
                 attn_u = torch.ones((1, 1, bs, Ku + bs), dtype=torch.bool, device=device)
                 _forward_slices(model, blk_t, sb * bs + torch.arange(bs, device=device), attn_u, caches["u"])
 
-    stats = {"n_blocks": 0, "stopped_by_eos": False, "eos_col": None}
+    if silence_run_frames < 0:
+        raise ValueError(
+            f"silence_run_frames must be >= 0, got {silence_run_frames}"
+        )
+    if not 1 <= silence_match_codebooks <= C:
+        raise ValueError(
+            "silence_match_codebooks must be in [1, C], got "
+            f"{silence_match_codebooks} for C={C}"
+        )
+
+    stats = {
+        "n_blocks": 0,
+        "stopped_by_eos": False,
+        "eos_col": None,
+        "stopped_by_silence": False,
+        "silence_col": None,
+        "silence_trigger_col": None,
+        "stop_reason": None,
+    }
 
     for b in range(seed_blocks, max_blocks):
         cur = torch.full((C, bs), mask_id, dtype=torch.long, device=device)
@@ -682,11 +789,39 @@ def _decode_block_causal(
         committed = torch.cat([committed, cur], dim=1)
         stats["n_blocks"] = b + 1
 
+        eos_generated_col = None
         eos_hits = (cur[0] == eos).nonzero(as_tuple=True)[0]
         if eos_hits.numel() > 0:
-            stop_abs = committed.size(1) - bs + int(eos_hits[0])
-            stats["stopped_by_eos"] = True
-            stats["eos_col"] = stop_abs
+            eos_abs = committed.size(1) - bs + int(eos_hits[0])
+            eos_generated_col = eos_abs - seed_total
+
+        silence_start = None
+        if silence_run_frames > 0:
+            generated = committed[:, seed_total:]
+            silence_start = _find_silence_run_start(
+                generated,
+                silence_run_frames,
+                match_codebooks=silence_match_codebooks,
+                start_frame=min_gen_frames,
+            )
+
+        stop_reason, trim_generated_col, trigger_generated_col = _choose_termination(
+            eos_generated_col,
+            silence_start,
+            silence_run_frames,
+        )
+        if stop_reason is not None:
+            stop_abs = seed_total + trim_generated_col
+            stats["stop_reason"] = stop_reason
+            if stop_reason == "eos":
+                stats["stopped_by_eos"] = True
+                stats["eos_col"] = stop_abs
+            else:
+                stats["stopped_by_silence"] = True
+                stats["silence_col"] = stop_abs
+                stats["silence_trigger_col"] = (
+                    seed_total + trigger_generated_col
+                )
             committed = committed[:, :stop_abs]
             break
 
@@ -724,6 +859,8 @@ def generate_blockwise_causal(
     num_step_per_block: int = 8,
     use_kv_cache: bool = True,
     instruct: Optional[str] = None,
+    silence_run_frames: int = 0,
+    silence_match_codebooks: int = 2,
 ):
     """User-facing wrapper: text -> audio tokens under block-causal geometry."""
     from omnivoice.models.omnivoice import OmniVoiceGenerationConfig
@@ -752,4 +889,6 @@ def generate_blockwise_causal(
         max_blocks=max_blocks,
         num_step_per_block=num_step_per_block,
         use_kv_cache=use_kv_cache,
+        silence_run_frames=silence_run_frames,
+        silence_match_codebooks=silence_match_codebooks,
     )
