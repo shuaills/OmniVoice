@@ -9,6 +9,7 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 WORKLOAD_PATH = ROOT / "training_contract_cfg_guidance_probe.sh"
+ENTRYPOINT_PATH = ROOT / "cfg_guidance_oms_entrypoint.sh"
 CANONICAL_PATH = ROOT / "training_contract_probe_first100.sh"
 
 
@@ -310,3 +311,17 @@ def test_cfg_guidance_runner_is_fresh_fail_closed_and_self_terminating() -> None
 
 def test_cfg_guidance_runner_is_valid_bash() -> None:
     subprocess.run(["bash", "-n", str(WORKLOAD_PATH)], check=True)
+
+
+def test_cfg_guidance_oms_entrypoint_is_commit_locked_and_self_terminating() -> None:
+    script = ENTRYPOINT_PATH.read_text()
+
+    assert "set -Eeuo pipefail" in script
+    assert "EXPECTED_COMMIT=${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}" in script
+    assert 'actual_commit=$(git rev-parse HEAD)' in script
+    assert 'python tests/test_cfg_unconditional_seed_policy.py' in script
+    assert 'exec bash "$C/training_contract_cfg_guidance_probe.sh"' in script
+    for forbidden in ("sleep infinity", "while true", "oms pod console"):
+        assert forbidden not in script.lower()
+
+    subprocess.run(["bash", "-n", str(ENTRYPOINT_PATH)], check=True)
