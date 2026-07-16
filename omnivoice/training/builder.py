@@ -32,10 +32,15 @@ Key functions:
     is ``[B, C, max_len]`` where B ≥ 1 and max_len ≤ batch_tokens.
 """
 
+import copy
+import json
 import logging
 import math
+import os
+from dataclasses import dataclass
 from functools import partial
-from typing import Tuple
+from pathlib import Path
+from typing import Any, Tuple
 
 import torch
 from torch.utils.data import DataLoader
@@ -51,6 +56,270 @@ from omnivoice.models.omnivoice import OmniVoice, OmniVoiceConfig, _resolve_mode
 from omnivoice.training.config import TrainingConfig
 
 logger = logging.getLogger(__name__)
+
+
+_REQUIRED_TEXT_SPECIAL_TOKENS = (
+    "<|denoise|>",
+    "<|lang_start|>",
+    "<|lang_end|>",
+    "<|instruct_start|>",
+    "<|instruct_end|>",
+    "<|text_start|>",
+    "<|text_end|>",
+)
+
+
+class TextVocabContractError(RuntimeError):
+    """Raised when a checkpoint cannot preserve its text embedding weights."""
+
+
+@dataclass(frozen=True)
+class CheckpointTextVocabContract:
+    """Read-only text-vocabulary facts collected from a saved checkpoint."""
+
+    checkpoint_path: str
+    tokenizer_size: int
+    config_vocab_size: int
+    embedding_rows: int
+    lm_head_rows: int | None
+    embedding_keys: tuple[str, ...]
+    lm_head_keys: tuple[str, ...]
+
+    @property
+    def requires_config_shim(self) -> bool:
+        """Whether loading needs an in-memory nested-config correction."""
+        return self.config_vocab_size != self.embedding_rows
+
+
+def _is_llm_tensor(key: str, suffix: str) -> bool:
+    return (key.startswith("llm.") or ".llm." in key) and key.endswith(suffix)
+
+
+def _checkpoint_safetensor_files(checkpoint_path: Path) -> list[Path]:
+    index_path = checkpoint_path / "model.safetensors.index.json"
+    if index_path.is_file():
+        with index_path.open() as f:
+            index = json.load(f)
+        filenames = sorted(set(index.get("weight_map", {}).values()))
+        files = [checkpoint_path / filename for filename in filenames]
+    else:
+        files = sorted(checkpoint_path.glob("model*.safetensors"))
+
+    if not files:
+        raise TextVocabContractError(
+            f"{checkpoint_path} has no model safetensors; cannot verify text "
+            "embedding rows without loading the checkpoint"
+        )
+    missing = [str(path) for path in files if not path.is_file()]
+    if missing:
+        raise TextVocabContractError(
+            "checkpoint safetensor index references missing files: "
+            + ", ".join(missing)
+        )
+    return files
+
+
+def _checkpoint_text_tensor_shapes(
+    checkpoint_path: Path,
+) -> tuple[dict[str, tuple[int, ...]], dict[str, tuple[int, ...]]]:
+    from safetensors import safe_open
+
+    embeddings: dict[str, tuple[int, ...]] = {}
+    lm_heads: dict[str, tuple[int, ...]] = {}
+    for tensor_path in _checkpoint_safetensor_files(checkpoint_path):
+        with safe_open(tensor_path, framework="pt", device="cpu") as tensors:
+            for key in tensors.keys():
+                target = None
+                if _is_llm_tensor(key, "embed_tokens.weight"):
+                    target = embeddings
+                elif _is_llm_tensor(key, "lm_head.weight"):
+                    target = lm_heads
+                if target is not None:
+                    if key in target:
+                        raise TextVocabContractError(
+                            "checkpoint repeats a text-vocab tensor key across "
+                            f"safetensor files: {key}"
+                        )
+                    target[key] = tuple(tensors.get_slice(key).get_shape())
+    return embeddings, lm_heads
+
+
+def _single_row_count(
+    tensors: dict[str, tuple[int, ...]], *, kind: str, required: bool
+) -> int | None:
+    if not tensors:
+        if required:
+            raise TextVocabContractError(
+                f"checkpoint has no LLM {kind} tensor in its model safetensors"
+            )
+        return None
+    malformed = {key: shape for key, shape in tensors.items() if len(shape) != 2}
+    if malformed:
+        raise TextVocabContractError(
+            f"checkpoint has non-matrix LLM {kind} tensors: {malformed}"
+        )
+    rows = {shape[0] for shape in tensors.values()}
+    if len(rows) != 1:
+        raise TextVocabContractError(
+            f"checkpoint LLM {kind} tensors disagree on row count: {tensors}"
+        )
+    return rows.pop()
+
+
+def inspect_checkpoint_text_vocab_contract(
+    checkpoint_path: str | os.PathLike[str],
+    *,
+    tokenizer: Any | None = None,
+) -> CheckpointTextVocabContract:
+    """Verify tokenizer/weight compatibility without mutating the checkpoint.
+
+    A stale nested config is repairable because it controls allocation only. The
+    tokenizer and saved embedding/head rows are not repairable here: changing
+    either would resize or reinitialize trained weights, so this function fails.
+    """
+    resolved_path = Path(checkpoint_path).resolve()
+    if not resolved_path.is_dir():
+        raise TextVocabContractError(
+            f"checkpoint path is not a local directory: {resolved_path}"
+        )
+
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained(str(resolved_path))
+    missing_tokens = [
+        token
+        for token in _REQUIRED_TEXT_SPECIAL_TOKENS
+        if token not in tokenizer.get_vocab()
+    ]
+    if missing_tokens:
+        raise TextVocabContractError(
+            "checkpoint tokenizer is missing required special tokens; refusing "
+            f"to grow/reinitialize its embeddings: {missing_tokens}"
+        )
+
+    checkpoint_config = AutoConfig.from_pretrained(str(resolved_path))
+    llm_config = getattr(checkpoint_config, "llm_config", None)
+    if llm_config is None or getattr(llm_config, "vocab_size", None) is None:
+        raise TextVocabContractError("checkpoint config has no llm_config.vocab_size")
+
+    embeddings, lm_heads = _checkpoint_text_tensor_shapes(resolved_path)
+    embedding_rows = _single_row_count(
+        embeddings, kind="input embedding", required=True
+    )
+    assert embedding_rows is not None
+    lm_head_rows = _single_row_count(lm_heads, kind="LM head", required=False)
+    tokenizer_size = len(tokenizer)
+    if tokenizer_size != embedding_rows:
+        raise TextVocabContractError(
+            "checkpoint tokenizer/embedding mismatch: "
+            f"tokenizer={tokenizer_size}, embedding_rows={embedding_rows}; "
+            "refusing to resize or reinitialize checkpoint weights"
+        )
+    if lm_head_rows is not None and lm_head_rows != embedding_rows:
+        raise TextVocabContractError(
+            "checkpoint embedding/LM-head mismatch: "
+            f"embedding_rows={embedding_rows}, lm_head_rows={lm_head_rows}"
+        )
+
+    return CheckpointTextVocabContract(
+        checkpoint_path=str(resolved_path),
+        tokenizer_size=tokenizer_size,
+        config_vocab_size=int(llm_config.vocab_size),
+        embedding_rows=embedding_rows,
+        lm_head_rows=lm_head_rows,
+        embedding_keys=tuple(sorted(embeddings)),
+        lm_head_keys=tuple(sorted(lm_heads)),
+    )
+
+
+def _checkpoint_config_shim(
+    checkpoint_path: str,
+    contract: CheckpointTextVocabContract,
+):
+    """Return a corrected config copy; never edit the source checkpoint."""
+    checkpoint_config = copy.deepcopy(AutoConfig.from_pretrained(checkpoint_path))
+    checkpoint_config.llm_config.vocab_size = contract.embedding_rows
+    return checkpoint_config
+
+
+def _model_text_vocab_rows(model: OmniVoice) -> tuple[int, int | None]:
+    input_embeddings = model.llm.get_input_embeddings()
+    if input_embeddings is None or not hasattr(input_embeddings, "weight"):
+        raise TextVocabContractError("loaded LLM has no input embedding weight")
+    embedding_rows = int(input_embeddings.weight.shape[0])
+
+    output_embeddings = model.llm.get_output_embeddings()
+    lm_head_rows = None
+    if output_embeddings is not None:
+        if not hasattr(output_embeddings, "weight"):
+            raise TextVocabContractError("loaded LLM head has no weight")
+        lm_head_rows = int(output_embeddings.weight.shape[0])
+    return embedding_rows, lm_head_rows
+
+
+def assert_model_text_vocab_contract(model: OmniVoice, tokenizer: Any) -> None:
+    """Require tokenizer, nested configs, embedding, and optional head to agree."""
+    tokenizer_size = len(tokenizer)
+    embedding_rows, lm_head_rows = _model_text_vocab_rows(model)
+    outer_vocab_size = int(model.config.llm_config.vocab_size)
+    inner_vocab_size = int(model.llm.config.vocab_size)
+    observed = {
+        "tokenizer": tokenizer_size,
+        "outer_llm_config": outer_vocab_size,
+        "inner_llm_config": inner_vocab_size,
+        "embedding_rows": embedding_rows,
+    }
+    if lm_head_rows is not None:
+        observed["lm_head_rows"] = lm_head_rows
+    if any(value != tokenizer_size for value in observed.values()):
+        raise TextVocabContractError(f"loaded text-vocab contract mismatch: {observed}")
+
+
+def _assert_clean_checkpoint_loading_info(loading_info: Any) -> None:
+    """Reject every HF load anomaly instead of accepting initialized weights."""
+
+    if not isinstance(loading_info, dict):
+        raise TextVocabContractError(
+            "checkpoint loader did not return structured loading information"
+        )
+    required_fields = (
+        "missing_keys",
+        "unexpected_keys",
+        "mismatched_keys",
+        "error_msgs",
+    )
+    absent_fields = [field for field in required_fields if field not in loading_info]
+    if absent_fields:
+        raise TextVocabContractError(
+            "checkpoint loading information is incomplete: "
+            + ", ".join(absent_fields)
+        )
+    anomalies = {
+        field: loading_info[field]
+        for field in required_fields
+        if loading_info[field]
+    }
+    if anomalies:
+        raise TextVocabContractError(
+            "checkpoint did not load strictly; refusing initialized, ignored, "
+            f"or mismatched weights: {anomalies}"
+        )
+
+
+def _synchronize_model_text_vocab_config(model: OmniVoice, tokenizer: Any) -> None:
+    """Synchronize config metadata after a deliberate base-model resize."""
+    tokenizer_size = len(tokenizer)
+    embedding_rows, lm_head_rows = _model_text_vocab_rows(model)
+    if embedding_rows != tokenizer_size or (
+        lm_head_rows is not None and lm_head_rows != tokenizer_size
+    ):
+        raise TextVocabContractError(
+            "cannot synchronize text-vocab config to incompatible weights: "
+            f"tokenizer={tokenizer_size}, embedding_rows={embedding_rows}, "
+            f"lm_head_rows={lm_head_rows}"
+        )
+    model.config.llm_config.vocab_size = tokenizer_size
+    model.llm.config.vocab_size = tokenizer_size
+    assert_model_text_vocab_contract(model, tokenizer)
 
 
 def build_model_and_tokenizer(
@@ -70,28 +339,48 @@ def build_model_and_tokenizer(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    new_tokens = [
-        "<|denoise|>",
-        "<|lang_start|>",
-        "<|lang_end|>",
-        "<|instruct_start|>",
-        "<|instruct_end|>",
-        "<|text_start|>",
-        "<|text_end|>",
+    tokens_to_add = [
+        token
+        for token in _REQUIRED_TEXT_SPECIAL_TOKENS
+        if token not in tokenizer.get_vocab()
     ]
-
-    tokens_to_add = [t for t in new_tokens if t not in tokenizer.get_vocab()]
     if tokens_to_add:
+        if config.init_from_checkpoint:
+            raise TextVocabContractError(
+                "checkpoint tokenizer is missing required special tokens; "
+                "refusing to grow/reinitialize its embeddings: "
+                f"{tokens_to_add}"
+            )
         tokenizer.add_special_tokens({"additional_special_tokens": tokens_to_add})
 
     if config.init_from_checkpoint:
-        logger.info(f"Loading weights from {config.init_from_checkpoint}")
-        model = OmniVoice.from_pretrained(
-            config.init_from_checkpoint,
+        contract = inspect_checkpoint_text_vocab_contract(
+            tokenizer_path, tokenizer=tokenizer
+        )
+        load_kwargs = {}
+        if contract.requires_config_shim:
+            load_kwargs["config"] = _checkpoint_config_shim(
+                tokenizer_path, contract
+            )
+            logger.warning(
+                "Applying read-only checkpoint vocab config shim: "
+                "config=%d, tokenizer/weights=%d",
+                contract.config_vocab_size,
+                contract.embedding_rows,
+            )
+        logger.info("Loading weights from %s", tokenizer_path)
+        model, loading_info = OmniVoice.from_pretrained(
+            tokenizer_path,
             attn_implementation=config.attn_implementation,
             dtype=torch.float32,
             train=True,
+            output_loading_info=True,
+            **load_kwargs,
         )
+        _assert_clean_checkpoint_loading_info(loading_info)
+        # A checkpoint load must preserve every trained embedding/head row.
+        # Only the copied config above may be corrected; never resize here.
+        assert_model_text_vocab_contract(model, tokenizer)
     else:
         resolved_llm = _resolve_model_path(config.llm_name_or_path)
         llm_config = AutoConfig.from_pretrained(resolved_llm)
@@ -116,9 +405,12 @@ def build_model_and_tokenizer(
         hf_logging.set_verbosity(original_level)
         model = OmniVoice(config=ov_config, llm=llm)
 
-    # 3. Resize Embeddings
-    if len(tokenizer) != model.config.llm_config.vocab_size:
-        model.llm.resize_token_embeddings(len(tokenizer))
+        # Resizing is allowed only for a fresh base-model initialization. The
+        # tokenizer's required special tokens define the new training vocab.
+        embedding_rows, _ = _model_text_vocab_rows(model)
+        if len(tokenizer) != embedding_rows:
+            model.llm.resize_token_embeddings(len(tokenizer))
+        _synchronize_model_text_vocab_config(model, tokenizer)
 
     # ---- perf experiment hooks (perf/step-time-20260708; default OFF) ----
     if config.perf_blockmask_cache:
@@ -228,7 +520,6 @@ def build_model_and_tokenizer(
             mode=config.perf_compile_mode,
             dynamic=config.perf_compile_dynamic,
         )
-        model.config.llm_config.vocab_size = len(tokenizer)
 
     if config.split_loss:
         if not config.block_training or config.block_scheme != "dual":
@@ -271,6 +562,7 @@ def build_model_and_tokenizer(
     model.config.pad_token_id = tokenizer.pad_token_id
     model.config.bos_token_id = tokenizer.bos_token_id
     model.config.eos_token_id = tokenizer.eos_token_id
+    assert_model_text_vocab_contract(model, tokenizer)
 
     return model, tokenizer
 
