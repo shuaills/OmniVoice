@@ -10,6 +10,7 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 CAMPAIGN = ROOT / "training_contract_eos_cfg_calibration_probe.sh"
+ENTRYPOINT = ROOT / "eos_cfg_calibration_oms_entrypoint.sh"
 GENERATOR = ROOT / "tests" / "seedtts_blockwise_gen.py"
 DUAL = ROOT / "omnivoice" / "blockdiff_dual.py"
 
@@ -181,6 +182,19 @@ def test_campaign_reuses_canonical_report_and_self_terminates() -> None:
         "guardian",
     ):
         assert forbidden not in script.lower()
+
+
+def test_oms_entrypoint_runs_preflight_then_execs_campaign_without_guardian() -> None:
+    script = ENTRYPOINT.read_text()
+
+    assert "set -Eeuo pipefail" in script
+    assert "RUN_EOS_CFG_TESTS=${RUN_EOS_CFG_TESTS:-1}" in script
+    assert "tests/test_block_eos_cfg_calibration.py" in script
+    assert 'exec bash "$C/training_contract_eos_cfg_calibration_probe.sh"' in script
+    for forbidden in ("sleep infinity", "while true", "oms pod console"):
+        assert forbidden not in script.lower()
+
+    subprocess.run(["bash", "-n", str(ENTRYPOINT)], check=True)
 
 
 def test_campaign_is_valid_bash() -> None:

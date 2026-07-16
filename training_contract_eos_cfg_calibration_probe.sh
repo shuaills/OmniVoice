@@ -196,6 +196,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 git diff --quiet --no-ext-diff || die "tracked unstaged changes make provenance ambiguous"
 git diff --cached --quiet --no-ext-diff || die "staged changes make provenance ambiguous"
 for tracked in \
+  eos_cfg_calibration_oms_entrypoint.sh \
   training_contract_eos_cfg_calibration_probe.sh \
   scripts/training_contract_probe_report.py \
   scripts/decode_sweep_report.py \
@@ -353,6 +354,7 @@ done
   echo "arms=${ARM_NAMES[*]}"
   echo "code_sha256_begin"
   sha256sum \
+    eos_cfg_calibration_oms_entrypoint.sh \
     training_contract_eos_cfg_calibration_probe.sh \
     scripts/training_contract_probe_report.py \
     scripts/decode_sweep_report.py \
