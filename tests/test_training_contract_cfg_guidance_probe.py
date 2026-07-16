@@ -1,7 +1,10 @@
+import os
 import re
 import shlex
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).parents[1]
@@ -24,21 +27,28 @@ def assignment(script: str, name: str) -> str:
 def test_cfg_guidance_runner_has_only_the_targeted_matrix() -> None:
     script = WORKLOAD_PATH.read_text()
 
-    assert array(script, "ARM_NAMES") == [
+    assert "MODE=${MODE:-calibrate}" in script
+    assert array(script, "CALIBRATE_ARM_NAMES") == [
         "shared_g2",
         "drop_ref_g0p5",
         "drop_ref_g1",
         "drop_ref_g1p5",
         "drop_ref_g2",
     ]
-    assert array(script, "ARM_CFG_POLICIES") == [
+    assert array(script, "CALIBRATE_CFG_POLICIES") == [
         "shared",
         "drop_ref",
         "drop_ref",
         "drop_ref",
         "drop_ref",
     ]
-    assert array(script, "ARM_GUIDANCES") == ["2.0", "0.5", "1.0", "1.5", "2.0"]
+    assert array(script, "CALIBRATE_GUIDANCES") == [
+        "2.0",
+        "0.5",
+        "1.0",
+        "1.5",
+        "2.0",
+    ]
     assert "BASELINE_ARM=shared_g2" in script
     assert "PROMPT_CONTRACT=current" in script
     assert "LANG_POLICY=dataset" in script
@@ -52,7 +62,8 @@ def test_cfg_guidance_runner_locks_subset_shards_seed_and_fixed_decode() -> None
     canonical = CANONICAL_PATH.read_text()
 
     assert "EXPECTED_COUNT=${EXPECTED_COUNT:-100}" in script
-    assert '100 | 300) ;;' in script
+    assert 'MODE=calibrate requires EXPECTED_COUNT=100' in script
+    assert 'MODE=promote requires EXPECTED_COUNT=300' in script
     assert "GPU_IDS=${GPU_IDS:-0,1,2}" in script
     assert '${#GPU_ARRAY[@]} == 3' in script
     assert "SEED_BASE=20260707" in script
@@ -69,6 +80,118 @@ def test_cfg_guidance_runner_locks_subset_shards_seed_and_fixed_decode() -> None
         '--shard "$shard/${#GPU_ARRAY[@]}"',
     ):
         assert fixed in script
+
+
+def run_contract(
+    result_root: Path, **overrides: str
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "MODE": "calibrate",
+            "EXPECTED_COUNT": "100",
+            "PROMOTED_GUIDANCE": "",
+            "RUN_ID": "pytest-contract",
+            "RESULT_ROOT": str(result_root),
+            **overrides,
+        }
+    )
+    return subprocess.run(
+        ["bash", str(WORKLOAD_PATH)],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"MODE": "unknown"}, "MODE must be calibrate or promote"),
+        (
+            {"MODE": "calibrate", "EXPECTED_COUNT": "300"},
+            "MODE=calibrate requires EXPECTED_COUNT=100",
+        ),
+        (
+            {"MODE": "calibrate", "PROMOTED_GUIDANCE": "0.5"},
+            "MODE=calibrate rejects PROMOTED_GUIDANCE",
+        ),
+        (
+            {
+                "MODE": "promote",
+                "EXPECTED_COUNT": "100",
+                "PROMOTED_GUIDANCE": "0.5",
+            },
+            "MODE=promote requires EXPECTED_COUNT=300",
+        ),
+        (
+            {"MODE": "promote", "EXPECTED_COUNT": "300"},
+            "MODE=promote requires PROMOTED_GUIDANCE",
+        ),
+        (
+            {
+                "MODE": "promote",
+                "EXPECTED_COUNT": "300",
+                "PROMOTED_GUIDANCE": "1",
+            },
+            "MODE=promote requires PROMOTED_GUIDANCE",
+        ),
+    ],
+)
+def test_cfg_guidance_runner_rejects_illegal_mode_combinations(
+    tmp_path: Path, overrides: dict[str, str], message: str
+) -> None:
+    result = run_contract(tmp_path, **overrides)
+
+    assert result.returncode != 0
+    assert message in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("guidance", "arm"),
+    [
+        ("0.5", "drop_ref_g0p5"),
+        ("1.0", "drop_ref_g1"),
+        ("1.5", "drop_ref_g1p5"),
+        ("2.0", "drop_ref_g2"),
+    ],
+)
+def test_promote_maps_every_allowed_guidance_to_its_candidate(
+    tmp_path: Path, guidance: str, arm: str
+) -> None:
+    script = WORKLOAD_PATH.read_text()
+    promote_case = re.search(
+        r'case "\$PROMOTED_GUIDANCE" in(?P<body>.*?)\n    esac',
+        script,
+        flags=re.DOTALL,
+    )
+
+    assert promote_case is not None
+    assert re.search(
+        rf"^      {re.escape(guidance)}\) promoted_arm={re.escape(arm)} ;;$",
+        promote_case.group("body"),
+        flags=re.MULTILINE,
+    )
+    missing_repo = tmp_path / "missing-repo"
+    result = run_contract(
+        tmp_path,
+        MODE="promote",
+        EXPECTED_COUNT="300",
+        PROMOTED_GUIDANCE=guidance,
+        C=str(missing_repo),
+    )
+    assert result.returncode != 0
+    assert f"required directory not found: {missing_repo}" in result.stderr
+
+
+def test_promote_matrix_contains_only_baseline_and_selected_candidate() -> None:
+    script = WORKLOAD_PATH.read_text()
+
+    assert 'ARM_NAMES=(shared_g2 "$promoted_arm")' in script
+    assert "ARM_CFG_POLICIES=(shared drop_ref)" in script
+    assert 'ARM_GUIDANCES=(2.0 "$PROMOTED_GUIDANCE")' in script
+    assert "expected_arm_count=2" in script
 
 
 def test_cfg_guidance_runner_uses_same_reporter_and_scorers_with_paired_output() -> None:

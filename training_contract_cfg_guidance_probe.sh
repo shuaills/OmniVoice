@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Self-terminating CFG guidance probe for OMS.
-# Fresh paired arms compare the historical shared-reference guidance=2 control
-# with drop_ref guidance in {0.5, 1.0, 1.5, 2.0} on the fixed zh/en subset.
+# Calibrate compares the historical shared-reference guidance=2 control with
+# drop_ref guidance in {0.5, 1.0, 1.5, 2.0} on first100. Promote reruns only
+# that control and one explicitly selected drop_ref candidate on first300.
 set -Eeuo pipefail
 
 # Repository and immutable model/data inputs. These intentionally match
@@ -17,10 +18,13 @@ CK=${CK:-$L/exp/blockcausal_splitloss_emilia_300k_lx20/checkpoint-300000}
 CONFIG_SRC=${CONFIG_SRC:-$MAIN/results_scratch_eosdecouple_50k/shim_ckpt/config.json}
 TREND=${TREND:-$MAIN/results_wer_trend}
 
-# Only 100 and its pre-registered 300-item expansion are valid. Three shards
-# preserve the generator's global seed mapping exactly:
+# Calibrate is the safe default. Promote must be explicitly selected together
+# with its candidate and first300 count. Three shards preserve the generator's
+# global seed mapping exactly:
 # torch.manual_seed(20260707 + global_subset_row_index).
+MODE=${MODE:-calibrate}
 EXPECTED_COUNT=${EXPECTED_COUNT:-100}
+PROMOTED_GUIDANCE=${PROMOTED_GUIDANCE:-}
 GPU_IDS=${GPU_IDS:-0,1,2}
 STEPS_PER_BLOCK=${STEPS_PER_BLOCK:-16}
 BLOCK_SIZE=${BLOCK_SIZE:-32}
@@ -32,14 +36,15 @@ RUN_ID=${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-${OMS_JOB_ID:-${HOSTNAME:-host}-$$}}
 
 PROMPT_CONTRACT=current
 LANG_POLICY=dataset
-CFG_SHARED=shared
-CFG_DROP_REF=drop_ref
 SEED_BASE=20260707
 
-ARM_NAMES=(shared_g2 drop_ref_g0p5 drop_ref_g1 drop_ref_g1p5 drop_ref_g2)
-ARM_CFG_POLICIES=(shared drop_ref drop_ref drop_ref drop_ref)
-ARM_GUIDANCES=(2.0 0.5 1.0 1.5 2.0)
+CALIBRATE_ARM_NAMES=(shared_g2 drop_ref_g0p5 drop_ref_g1 drop_ref_g1p5 drop_ref_g2)
+CALIBRATE_CFG_POLICIES=(shared drop_ref drop_ref drop_ref drop_ref)
+CALIBRATE_GUIDANCES=(2.0 0.5 1.0 1.5 2.0)
 BASELINE_ARM=shared_g2
+ARM_NAMES=()
+ARM_CFG_POLICIES=()
+ARM_GUIDANCES=()
 
 RES=$RESULT_ROOT/$RUN_ID
 SHIM=$RES/shim
@@ -111,21 +116,49 @@ anchor_for_lang() {
 }
 
 [[ $RUN_ID =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid RUN_ID: $RUN_ID"
-case "$EXPECTED_COUNT" in
-  100 | 300) ;;
-  *) die "EXPECTED_COUNT must be 100 or 300, got $EXPECTED_COUNT" ;;
+case "$MODE" in
+  calibrate)
+    [[ $EXPECTED_COUNT == 100 ]] || \
+      die "MODE=calibrate requires EXPECTED_COUNT=100, got $EXPECTED_COUNT"
+    [[ -z $PROMOTED_GUIDANCE ]] || \
+      die "MODE=calibrate rejects PROMOTED_GUIDANCE; got $PROMOTED_GUIDANCE"
+    ARM_NAMES=("${CALIBRATE_ARM_NAMES[@]}")
+    ARM_CFG_POLICIES=("${CALIBRATE_CFG_POLICIES[@]}")
+    ARM_GUIDANCES=("${CALIBRATE_GUIDANCES[@]}")
+    expected_arm_count=5
+    ;;
+  promote)
+    [[ $EXPECTED_COUNT == 300 ]] || \
+      die "MODE=promote requires EXPECTED_COUNT=300, got $EXPECTED_COUNT"
+    case "$PROMOTED_GUIDANCE" in
+      0.5) promoted_arm=drop_ref_g0p5 ;;
+      1.0) promoted_arm=drop_ref_g1 ;;
+      1.5) promoted_arm=drop_ref_g1p5 ;;
+      2.0) promoted_arm=drop_ref_g2 ;;
+      *)
+        die "MODE=promote requires PROMOTED_GUIDANCE in {0.5,1.0,1.5,2.0}; got ${PROMOTED_GUIDANCE:-unset}"
+        ;;
+    esac
+    ARM_NAMES=(shared_g2 "$promoted_arm")
+    ARM_CFG_POLICIES=(shared drop_ref)
+    ARM_GUIDANCES=(2.0 "$PROMOTED_GUIDANCE")
+    expected_arm_count=2
+    ;;
+  *) die "MODE must be calibrate or promote, got $MODE" ;;
 esac
-[[ ${#ARM_NAMES[@]} -eq 5 ]] || die "the targeted matrix must contain five arms"
+[[ ${#ARM_NAMES[@]} -eq $expected_arm_count ]] || \
+  die "MODE=$MODE expected $expected_arm_count arms, got ${#ARM_NAMES[@]}"
 [[ ${#ARM_CFG_POLICIES[@]} -eq ${#ARM_NAMES[@]} ]] || \
   die "CFG policy matrix length mismatch"
 [[ ${#ARM_GUIDANCES[@]} -eq ${#ARM_NAMES[@]} ]] || \
   die "guidance matrix length mismatch"
-declare -A ARM_SIGNATURES=()
 for ((i = 0; i < ${#ARM_NAMES[@]}; i++)); do
   signature="${ARM_CFG_POLICIES[$i]}|${ARM_GUIDANCES[$i]}"
-  [[ -z ${ARM_SIGNATURES[$signature]+x} ]] || \
-    die "duplicate arm argv contract: ${ARM_SIGNATURES[$signature]} and ${ARM_NAMES[$i]}"
-  ARM_SIGNATURES[$signature]=${ARM_NAMES[$i]}
+  for ((j = 0; j < i; j++)); do
+    prior_signature="${ARM_CFG_POLICIES[$j]}|${ARM_GUIDANCES[$j]}"
+    [[ $signature != "$prior_signature" ]] || \
+      die "duplicate arm argv contract: ${ARM_NAMES[$j]} and ${ARM_NAMES[$i]}"
+  done
 done
 
 require_dir "$C"
@@ -196,7 +229,7 @@ branch=$(git branch --show-current)
 ck_real=$(realpath "$CK")
 base_real=$(realpath "$BASE")
 config_real=$(realpath "$CONFIG_SRC")
-v "CFG_GUIDANCE_PROBE_START run_id=$RUN_ID commit=$commit time=$(date -u +%FT%TZ)"
+v "CFG_GUIDANCE_PROBE_START run_id=$RUN_ID mode=$MODE commit=$commit time=$(date -u +%FT%TZ)"
 v "MATRIX arms=${ARM_NAMES[*]} langs=zh,en count=$EXPECTED_COUNT checkpoint=$ck_real gpu_ids=$GPU_IDS"
 v "FIXED prompt=$PROMPT_CONTRACT lang_policy=$LANG_POLICY steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 silence_stop=0 seed_base=$SEED_BASE"
 
@@ -233,6 +266,8 @@ done
   echo "checkpoint=$ck_real"
   echo "config_source=$config_real"
   echo "base_model=$base_real"
+  echo "mode=$MODE"
+  echo "promoted_guidance=${PROMOTED_GUIDANCE:-unset}"
   echo "expected_count=$EXPECTED_COUNT"
   echo "gpu_ids=$GPU_IDS"
   echo "generation_shards=${#GPU_ARRAY[@]}"
@@ -403,4 +438,4 @@ python "$REPORTER" aggregate \
   --output-md "$RES/SUMMARY.md" | tee -a "$VERDICT"
 
 tee -a "$VERDICT" < "$RES/SUMMARY.md"
-v "CFG_GUIDANCE_PROBE_DONE run_id=$RUN_ID result=$RES time=$(date -u +%FT%TZ)"
+v "CFG_GUIDANCE_PROBE_DONE run_id=$RUN_ID mode=$MODE result=$RES time=$(date -u +%FT%TZ)"
