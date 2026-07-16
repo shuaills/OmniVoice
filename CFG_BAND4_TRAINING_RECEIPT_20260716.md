@@ -14,6 +14,8 @@
 - H100 主作业：`shuai-cfg9055-band4-10k-h2-v2`，2×H100、GA=2、10k steps，输出 `/opt/gpfs/users/shuai/experiments/cfg-band4-9055-20260717/main10k_shuai-cfg9055-band4-10k-h2-v2`；
 - 4090 工程作业：`shuai-cfg9055-band4-smoke-r2-v2`，2×RTX4090、300 steps，输出 `/opt/gpfs/users/shuai/experiments/cfg-band4-9055-20260717/smoke300_shuai-cfg9055-band4-smoke-r2-v2`。
 
+发车后证据：4090 工程作业已于 `2026-07-17 01:59 CST` 完成 `300/300`，`rc=0`，最终窗口 `loss=3.8898`、`audio=4.4603`、`eos=0.0190`、`void=0.0054`，checkpoint 已写入 `checkpoint-300`。H100 主作业已进入稳定训练，step 50 窗口 `loss=4.0152`，所有 acoustic/EOS/void 统计有限；该数字只证明工程链路工作，不作为质量成绩。
+
 ## 目标
 
 在保留 Band-4 晚停长尾收益的前提下，让训练真正覆盖推理时的两种 CFG 无条件分支：
