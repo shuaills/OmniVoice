@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: cfg9055_band4_train.sh main10k|smoke300" >&2
+  echo "usage: cfg9055_band4_train.sh main10k|smoke300|band1_10k|shared10_10k|q32_10k" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -19,6 +19,18 @@ case "$mode" in
     ;;
   smoke300)
     config=examples/config/train_config_cfg9055_band4_smoke300.json
+    default_gpus=2
+    ;;
+  band1_10k)
+    config=examples/config/train_config_cfg9055_band1_10k.json
+    default_gpus=2
+    ;;
+  shared10_10k)
+    config=examples/config/train_config_cfg90100_band4_10k.json
+    default_gpus=2
+    ;;
+  q32_10k)
+    config=examples/config/train_config_cfg9055_band4_q32_10k.json
     default_gpus=2
     ;;
   *)
@@ -80,6 +92,42 @@ with open(destination, "w") as stream:
     json.dump(config, stream, indent=2)
 PY
 fi
+
+python - "$run_config" "$mode" <<'PY'
+import json
+import sys
+
+config_path, mode = sys.argv[1:]
+with open(config_path) as stream:
+    config = json.load(stream)
+
+expected = {
+    "main10k": (0.90, 0.05, 0.05, 4, 1, 32, 0.5),
+    "smoke300": (0.90, 0.05, 0.05, 4, 1, 32, 0.5),
+    "band1_10k": (0.90, 0.05, 0.05, 1, 1, 32, 0.5),
+    "shared10_10k": (0.90, 0.10, 0.00, 4, 1, 32, 0.5),
+    "q32_10k": (0.90, 0.05, 0.05, 4, 32, 32, 0.0),
+}[mode]
+actual = (
+    config["cfg_branch_cond_ratio"],
+    config["cfg_branch_shared_ratio"],
+    config["cfg_branch_drop_ref_ratio"],
+    config["eos_band_k"],
+    config["cfg_drop_ref_q_min"],
+    config["cfg_drop_ref_q_max"],
+    config["cfg_drop_ref_short_bucket_ratio"],
+)
+if actual != expected:
+    raise SystemExit(
+        f"training arm contract mismatch: mode={mode} expected={expected} actual={actual}"
+    )
+if mode == "smoke300":
+    if config["steps"] != 300:
+        raise SystemExit(f"smoke300 requires steps=300, got {config['steps']}")
+elif config["steps"] != 10_000:
+    raise SystemExit(f"{mode} requires steps=10000, got {config['steps']}")
+print(f"CFG_ARM_CONFIG_OK mode={mode} contract={actual}")
+PY
 
 python - "$root" <<'PY'
 import pathlib
