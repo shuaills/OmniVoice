@@ -95,12 +95,16 @@ def test_decoder_trace_is_optional_compact_and_records_actual_selection() -> Non
 def test_campaign_is_a_locked_four_arm_paired_probe() -> None:
     script = CAMPAIGN.read_text()
 
+    assert "ARM_PROFILE=${ARM_PROFILE:-full}" in script
     assert array(script, "ARM_NAMES") == [
         "legacy",
         "renorm",
         "guided",
         "mass_preserving",
     ]
+    assert "ARM_NAMES=(legacy guided)" in script
+    assert "ARM_EOS_CFG_CALIBRATIONS=(legacy guided)" in script
+    assert 'echo "arm_profile=$ARM_PROFILE"' in script
     assert array(script, "ARM_EOS_CFG_CALIBRATIONS") == [
         "legacy",
         "renorm",
@@ -157,7 +161,12 @@ def test_campaign_supports_fail_closed_language_and_utterance_filters() -> None:
         ({"LANGS": "fr"}, "LANGS supports only zh,en"),
         ({"LANGS": "en,en"}, "duplicate language in LANGS"),
         ({"EOS_CFG_TRACE": "yes"}, "EOS_CFG_TRACE must be 0 or 1"),
+        ({"ARM_PROFILE": "renorm"}, "ARM_PROFILE must be full or guided"),
         ({"GPU_IDS": "0"}, "GPU_IDS must provide at least two GPUs"),
+        (
+            {"ARM_PROFILE": "guided", "GPU_IDS": "0"},
+            "GPU_IDS must provide at least two GPUs",
+        ),
     ],
 )
 def test_campaign_rejects_invalid_microprobe_contract_before_io(

@@ -23,6 +23,7 @@ UTT_IDS=${UTT_IDS:-}
 UTT_REGEX=${UTT_REGEX:-}
 GPU_IDS=${GPU_IDS:-0,1}
 EOS_CFG_TRACE=${EOS_CFG_TRACE:-0}
+ARM_PROFILE=${ARM_PROFILE:-full}
 ITEM_ERROR_POLICY=${ITEM_ERROR_POLICY:-fail-at-end}
 RESULT_ROOT=${RESULT_ROOT:-/opt/gpfs/users/shuai/work/training-contract-probes/results/eos-cfg-calibration-first${EXPECTED_COUNT}}
 RUN_ID=${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-${OMS_JOB_ID:-${HOSTNAME:-host}-$$}}
@@ -63,6 +64,20 @@ require_file() {
 require_dir() {
   [[ -d $1 ]] || die "required directory not found: $1"
 }
+
+case "$ARM_PROFILE" in
+  full)
+    EXPECTED_ARM_COUNT=4
+    ;;
+  guided)
+    ARM_NAMES=(legacy guided)
+    ARM_EOS_CFG_CALIBRATIONS=(legacy guided)
+    EXPECTED_ARM_COUNT=2
+    ;;
+  *)
+    die "ARM_PROFILE must be full or guided, got $ARM_PROFILE"
+    ;;
+esac
 
 cleanup() {
   local rc=$?
@@ -141,7 +156,8 @@ if [[ -n $UTT_IDS ]]; then
     die "UTT_IDS count must equal EXPECTED_COUNT: ids=${#UTT_ID_ARRAY[@]} count=$EXPECTED_COUNT"
 fi
 
-[[ ${#ARM_NAMES[@]} -eq 4 ]] || die "EOS calibration matrix must contain four arms"
+[[ ${#ARM_NAMES[@]} -eq $EXPECTED_ARM_COUNT ]] || \
+  die "EOS calibration matrix/profile mismatch: profile=$ARM_PROFILE arms=${#ARM_NAMES[@]}"
 [[ ${#ARM_EOS_CFG_CALIBRATIONS[@]} -eq ${#ARM_NAMES[@]} ]] || \
   die "EOS calibration matrix length mismatch"
 
@@ -215,7 +231,7 @@ ck_real=$(realpath "$CK")
 base_real=$(realpath "$BASE")
 config_real=$(realpath "$CONFIG_SRC")
 v "EOS_CFG_CALIBRATION_PROBE_START run_id=$RUN_ID commit=$commit time=$(date -u +%FT%TZ)"
-v "MATRIX arms=${ARM_NAMES[*]} langs=$EXPECTED_LANGUAGES count=$EXPECTED_COUNT checkpoint=$ck_real gpu_ids=$GPU_IDS"
+v "MATRIX profile=$ARM_PROFILE arms=${ARM_NAMES[*]} langs=$EXPECTED_LANGUAGES count=$EXPECTED_COUNT checkpoint=$ck_real gpu_ids=$GPU_IDS"
 v "FIXED prompt=$PROMPT_CONTRACT cfg_seed=$CFG_UNCONDITIONAL_SEED_POLICY guidance=$GUIDANCE_SCALE steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS trace=$EOS_CFG_TRACE"
 
 cp "$config_real" "$SHIM/config.json"
@@ -349,6 +365,7 @@ done
   echo "utt_regex=${UTT_REGEX:-unset}"
   echo "gpu_ids=$GPU_IDS"
   echo "trace=$EOS_CFG_TRACE"
+  echo "arm_profile=$ARM_PROFILE"
   echo "generation_shards=${#GPU_ARRAY[@]}"
   echo "seed_contract=torch.manual_seed($SEED_BASE + generation_seed_index); filtered probes preserve canonical source row indices; identical subset and shard count for every arm"
   echo "fixed_contract=prompt=$PROMPT_CONTRACT cfg_seed=$CFG_UNCONDITIONAL_SEED_POLICY guidance=$GUIDANCE_SCALE steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 silence_stop=0"
