@@ -8,6 +8,7 @@ C=${C:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}
 DL=${DL:-/opt/gpfs/users/yinfeng/work/OmniVoice}
 EXPECTED_COMMIT=${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}
 RUN_CFG_SWEEP_TESTS=${RUN_CFG_SWEEP_TESTS:-1}
+export C DL
 
 cd "$C"
 actual_commit=$(git rev-parse HEAD)

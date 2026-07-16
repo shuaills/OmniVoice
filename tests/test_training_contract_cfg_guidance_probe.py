@@ -318,6 +318,7 @@ def test_cfg_guidance_oms_entrypoint_is_commit_locked_and_self_terminating() -> 
 
     assert "set -Eeuo pipefail" in script
     assert "EXPECTED_COMMIT=${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}" in script
+    assert "export C DL" in script
     assert 'actual_commit=$(git rev-parse HEAD)' in script
     assert 'python tests/test_cfg_unconditional_seed_policy.py' in script
     assert 'exec bash "$C/training_contract_cfg_guidance_probe.sh"' in script
