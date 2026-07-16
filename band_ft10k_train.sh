@@ -52,6 +52,11 @@ if [[ ! "$run_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "RUN_ID contains unsupported characters: $run_id" >&2
   exit 2
 fi
+num_gpus=${NUM_GPUS:-8}
+if [[ ! "$num_gpus" =~ ^[1-8]$ ]]; then
+  echo "NUM_GPUS must be an integer from 1 through 8: $num_gpus" >&2
+  exit 2
+fi
 
 L=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SOURCE_EXP=/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/exp/blockcausal_splitloss_emilia_300k_lx20
@@ -93,11 +98,11 @@ if [[ -e "$output" || -e "$log_path" ]]; then
   exit 1
 fi
 
-# Header-only/tokenizer preflight runs once before accelerate allocates 8 ranks.
+# Header-only/tokenizer preflight runs once before accelerate allocates ranks.
 python scripts/check_checkpoint_vocab.py --train-config "$run_config"
 
-echo "BAND_FT_START arm=$arm steps=${smoke_steps:-10000} run_id=$run_id output=$output commit=$(git rev-parse HEAD) time=$(date -u +%FT%TZ)"
-accelerate launch --gpu_ids "$(seq -s, 0 7)" --num_processes 8 \
+echo "BAND_FT_START arm=$arm steps=${smoke_steps:-10000} run_id=$run_id gpus=$num_gpus output=$output commit=$(git rev-parse HEAD) time=$(date -u +%FT%TZ)"
+accelerate launch --gpu_ids "$(seq -s, 0 $((num_gpus - 1)))" --num_processes "$num_gpus" \
   -m omnivoice.cli.train \
   --train_config "$run_config" \
   --data_config examples/config/data_config_emilia_full_blockparity.json \
