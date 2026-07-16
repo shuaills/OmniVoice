@@ -51,6 +51,14 @@ ap.add_argument(
     ),
 )
 ap.add_argument(
+    '--measure-token-decode',
+    action='store_true',
+    help=(
+        'measure only the synchronous _decode_block_causal token-generation '
+        'region; excludes model load, reference encode, codec decode, and WAV I/O'
+    ),
+)
+ap.add_argument(
     '--cfg-unconditional-seed-policy',
     default='shared',
     choices=['shared', 'drop_ref'],
@@ -227,6 +235,7 @@ done = skipped = failed = 0
 t_start = time.time()
 meta_path = os.path.join(args.out, f'gen_meta_shard{i}.jsonl')
 fail_path = os.path.join(args.out, f'failures_shard{i}.jsonl')
+timing_warmup_pending = args.measure_token_decode
 for k, row in enumerate(rows):
     utt_id, ptext, pwav, ttext = row[0], row[1], row[2], row[3]
     outwav = os.path.join(args.out, f'{utt_id}.wav')
@@ -285,6 +294,10 @@ for k, row in enumerate(rows):
             int(0.3 * model._estimate_target_tokens(ttext, None, None)),
         )
         eos_cfg_trace = [] if args.eos_cfg_trace else None
+        token_decode_seconds = None
+        if args.measure_token_decode:
+            torch.cuda.synchronize()
+            token_decode_started = time.perf_counter()
         toks, stats = _decode_block_causal(
             model, prefix, gen, block_size=bs, max_blocks=args.max_blocks,
             num_step_per_block=args.steps_per_block, use_kv_cache=True,
@@ -294,6 +307,13 @@ for k, row in enumerate(rows):
             silence_run_frames=silence_run_frames,
             silence_match_codebooks=args.silence_match_codebooks,
             eos_cfg_trace=eos_cfg_trace)
+        if args.measure_token_decode:
+            torch.cuda.synchronize()
+            token_decode_seconds = time.perf_counter() - token_decode_started
+            if not math.isfinite(token_decode_seconds) or token_decode_seconds <= 0:
+                raise RuntimeError(
+                    f'invalid token decode timing: {token_decode_seconds!r}'
+                )
         _dd = os.environ.get('DUMP_TOKENS_DIR')
         if _dd:
             import numpy as _np
@@ -331,6 +351,18 @@ for k, row in enumerate(rows):
                 'generation_seed_index': generation_seed_index,
                 'generation_seed_value': generation_seed,
                 'n_blocks': stats['n_blocks']}
+        if args.measure_token_decode:
+            audio_duration_seconds = len(wav_np) / tsr
+            token_decode_rtf = token_decode_seconds / audio_duration_seconds
+            if not math.isfinite(token_decode_rtf) or token_decode_rtf <= 0:
+                raise RuntimeError(
+                    f'invalid token decode RTF: {token_decode_rtf!r}'
+                )
+            meta.update({
+                'token_decode_seconds': token_decode_seconds,
+                'token_decode_rtf': token_decode_rtf,
+                'timing_warmup': timing_warmup_pending,
+            })
         if eos_cfg_trace is not None:
             meta['eos_cfg_trace'] = eos_cfg_trace
         experimental_contract = (
@@ -357,6 +389,8 @@ for k, row in enumerate(rows):
             })
         with open(meta_path, 'a') as fh:
             fh.write(json.dumps(meta, ensure_ascii=False) + '\n')
+        if args.measure_token_decode:
+            timing_warmup_pending = False
     except Exception as e:
         failed += 1
         with open(fail_path, 'a') as fh:

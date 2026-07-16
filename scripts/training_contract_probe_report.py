@@ -40,6 +40,75 @@ def load_decode_reporter() -> Any:
 
 COMMON = load_decode_reporter()
 
+TOKEN_DECODE_TIMING_FIELDS = {
+    "token_decode_seconds",
+    "token_decode_rtf",
+    "timing_warmup",
+}
+TOKEN_DECODE_TIMING_SUMMARY_FIELDS = [
+    "timed_count",
+    "token_decode_seconds_mean",
+    "token_decode_seconds_median",
+    "token_decode_seconds_p95",
+    "token_decode_rtf_mean",
+    "token_decode_rtf_median",
+    "token_decode_rtf_p95",
+]
+
+
+def summarize_token_decode_timing(
+    meta: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Validate optional timing metadata and summarize non-warmup rows."""
+    field_sets = [TOKEN_DECODE_TIMING_FIELDS.intersection(row) for row in meta.values()]
+    if not any(field_sets):
+        return None
+    partial = {
+        utt_id: sorted(TOKEN_DECODE_TIMING_FIELDS - row.keys())
+        for utt_id, row in meta.items()
+        if TOKEN_DECODE_TIMING_FIELDS - row.keys()
+    }
+    if partial:
+        fail(
+            "partial token decode timing metadata: "
+            f"{dict(list(partial.items())[:5])}"
+        )
+
+    for utt_id, row in meta.items():
+        for field in ("token_decode_seconds", "token_decode_rtf"):
+            value = row[field]
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                fail(
+                    "invalid token decode timing: "
+                    f"id={utt_id} field={field} value={value!r}"
+                )
+        if not isinstance(row["timing_warmup"], bool):
+            fail(
+                "invalid token decode timing: "
+                f"id={utt_id} field=timing_warmup "
+                f"value={row['timing_warmup']!r}"
+            )
+
+    timed = [row for row in meta.values() if not row["timing_warmup"]]
+    if not timed:
+        fail("token decode timing has no post-warmup rows")
+    seconds = [float(row["token_decode_seconds"]) for row in timed]
+    rtfs = [float(row["token_decode_rtf"]) for row in timed]
+    return {
+        "timed_count": len(timed),
+        "token_decode_seconds_mean": statistics.mean(seconds),
+        "token_decode_seconds_median": statistics.median(seconds),
+        "token_decode_seconds_p95": COMMON.percentile95_like_campaign(seconds),
+        "token_decode_rtf_mean": statistics.mean(rtfs),
+        "token_decode_rtf_median": statistics.median(rtfs),
+        "token_decode_rtf_p95": COMMON.percentile95_like_campaign(rtfs),
+    }
+
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -248,6 +317,18 @@ def validate_generation(args: argparse.Namespace) -> None:
         str(wav_dir / "failures_shard*.jsonl"),
     )
     COMMON.require_exact_ids("generation metadata", expected_ids, list(meta))
+    timing_summary = summarize_token_decode_timing(meta)
+    if timing_summary is not None:
+        expected_warmup_ids = set(expected_ids[: args.num_shards])
+        actual_warmup_ids = {
+            utt_id for utt_id, row in meta.items() if row["timing_warmup"]
+        }
+        if actual_warmup_ids != expected_warmup_ids:
+            fail(
+                "timing warmup IDs mismatch: "
+                f"expected={sorted(expected_warmup_ids)} "
+                f"actual={sorted(actual_warmup_ids)}"
+            )
     if seed_index_map_path is not None:
         for utt_id in expected_ids:
             expected_index = expected_seed_indices[utt_id]
@@ -360,6 +441,8 @@ def validate_generation(args: argparse.Namespace) -> None:
         "stop_reasons": stop_reasons,
         "wav_dir": str(wav_dir),
     }
+    if timing_summary is not None:
+        payload["token_decode_timing"] = timing_summary
     output = Path(args.output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
@@ -390,6 +473,11 @@ def summarize_arm(args: argparse.Namespace) -> None:
         summary_out=args.summary_out,
     )
     summary = COMMON.summarize_arm(common_args)
+    timing_summary = summarize_token_decode_timing(
+        COMMON.parse_meta(args.meta_glob, args.failures_glob)
+    )
+    if timing_summary is not None:
+        summary.update(timing_summary)
     summary.update(
         {
             "lang_policy": args.lang_policy,
@@ -497,6 +585,38 @@ def aggregate(args: argparse.Namespace) -> None:
             if field not in row:
                 fail(f"summary lacks {field}: arm={row['arm']} lang={row['lang']}")
 
+    timing_field_set = set(TOKEN_DECODE_TIMING_SUMMARY_FIELDS)
+    timing_sets = [timing_field_set.intersection(row) for row in rows]
+    timing_enabled = bool(any(timing_sets))
+    if timing_enabled and any(fields != timing_field_set for fields in timing_sets):
+        fail("mixed token decode timing contract across summaries")
+    if timing_enabled:
+        for row in rows:
+            timed_count = row["timed_count"]
+            if (
+                isinstance(timed_count, bool)
+                or not isinstance(timed_count, int)
+                or timed_count <= 0
+            ):
+                fail(
+                    "invalid token decode timing summary: "
+                    f"arm={row['arm']} lang={row['lang']} "
+                    f"timed_count={timed_count!r}"
+                )
+            for field in TOKEN_DECODE_TIMING_SUMMARY_FIELDS[1:]:
+                value = row[field]
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    or value <= 0
+                ):
+                    fail(
+                        "invalid token decode timing summary: "
+                        f"arm={row['arm']} lang={row['lang']} "
+                        f"field={field} value={value!r}"
+                    )
+
     for lang in languages:
         baseline_row = next(
             row
@@ -517,10 +637,13 @@ def aggregate(args: argparse.Namespace) -> None:
         output.parent.mkdir(parents=True, exist_ok=True)
         if output.exists():
             fail(f"refusing to overwrite report: {output}")
+    output_fields = list(SUMMARY_FIELDS)
+    if timing_enabled:
+        output_fields.extend(TOKEN_DECODE_TIMING_SUMMARY_FIELDS)
     with Path(args.output_tsv).open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, delimiter="\t", fieldnames=SUMMARY_FIELDS)
+        writer = csv.DictWriter(handle, delimiter="\t", fieldnames=output_fields)
         writer.writeheader()
-        writer.writerows({field: row[field] for field in SUMMARY_FIELDS} for row in rows)
+        writer.writerows({field: row[field] for field in output_fields} for row in rows)
 
     payload = {
         "baseline_arm": args.baseline_arm,
@@ -538,11 +661,23 @@ def aggregate(args: argparse.Namespace) -> None:
         "",
         f"Baseline arm: `{args.baseline_arm}`. Duration columns are ratios to the fixed R1 anchors.",
         "",
-        "| lang | arm | lang policy | prompt | CFG seed | gs | WER % | SIM | paired SIM Δ mean | Δ median | +/=/- | dur mean | dur median | dur p95 | runaway | <0.6 | >2 |",
-        "|:---:|:---|:---|:---|:---|---:|---:|---:|---:|---:|:---:|---:|---:|---:|---:|---:|---:|",
     ]
+    if timing_enabled:
+        lines.extend(
+            [
+                "| lang | arm | lang policy | prompt | CFG seed | gs | WER % | SIM | paired SIM Δ mean | Δ median | +/=/- | dur mean | dur median | dur p95 | runaway | <0.6 | >2 | timed count | token decode s mean | median | p95 | token decode RTF mean | median | token decode RTF p95 |",
+                "|:---:|:---|:---|:---|:---|---:|---:|---:|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "| lang | arm | lang policy | prompt | CFG seed | gs | WER % | SIM | paired SIM Δ mean | Δ median | +/=/- | dur mean | dur median | dur p95 | runaway | <0.6 | >2 |",
+                "|:---:|:---|:---|:---|:---|---:|---:|---:|---:|---:|:---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
     for row in rows:
-        lines.append(
+        line = (
             f"| {row['lang']} | {row['arm']} | {row['lang_policy']} | "
             f"{row['prompt_contract']} | {row['cfg_unconditional_seed_policy']} | "
             f"{row['guidance_scale']:g} | {row['wer_percent']:.2f} | "
@@ -553,6 +688,18 @@ def aggregate(args: argparse.Namespace) -> None:
             f"{row['duration_ratio_p95']:.3f} | {row['runaway']} | "
             f"{row['lt_0_6']} | {row['gt_2']} |"
         )
+        if timing_enabled:
+            line = (
+                line[:-1]
+                + f" {row['timed_count']} | "
+                f"{row['token_decode_seconds_mean']:.4f} | "
+                f"{row['token_decode_seconds_median']:.4f} | "
+                f"{row['token_decode_seconds_p95']:.4f} | "
+                f"{row['token_decode_rtf_mean']:.4f} | "
+                f"{row['token_decode_rtf_median']:.4f} | "
+                f"{row['token_decode_rtf_p95']:.4f} |"
+            )
+        lines.append(line)
     Path(args.output_md).write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(
         f"CONTRACT_REPORT_OK rows={len(rows)} baseline={args.baseline_arm} "

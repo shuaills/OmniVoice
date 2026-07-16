@@ -40,9 +40,9 @@ class _FakeModel:
     )
 
 
-def _gen_config():
+def _gen_config(guidance_scale=2.0):
     return SimpleNamespace(
-        guidance_scale=2.0,
+        guidance_scale=guidance_scale,
         t_shift=1.0,
         layer_penalty_factor=0.0,
         position_temperature=0.0,
@@ -66,9 +66,18 @@ def _expected_generated():
 
 
 def _install_mock_decode(patches):
-    records = {"forward": [], "cfg_shapes": [], "masks": []}
+    records = {
+        "forward": [],
+        "cfg_shapes": [],
+        "masks": [],
+        "cache_creations": 0,
+    }
 
-    patches.setattr(transformers, "DynamicCache", _FakeCache)
+    def make_cache():
+        records["cache_creations"] += 1
+        return _FakeCache()
+
+    patches.setattr(transformers, "DynamicCache", make_cache)
     patches.setattr(
         omnivoice_model,
         "_get_time_steps",
@@ -153,7 +162,7 @@ def _install_mock_decode(patches):
     return records
 
 
-def _decode(*, use_cache, policy=None):
+def _decode(*, use_cache, policy=None, guidance_scale=2.0):
     prefix, seed = _inputs()
     kwargs = {}
     if policy is not None:
@@ -161,7 +170,7 @@ def _decode(*, use_cache, policy=None):
     return dual._decode_block_causal(
         _FakeModel(),
         prefix,
-        _gen_config(),
+        _gen_config(guidance_scale),
         block_size=BLOCK_SIZE,
         max_blocks=3,
         num_step_per_block=1,
@@ -229,6 +238,23 @@ class TestCfgUnconditionalSeedPolicy(unittest.TestCase):
                 c_shape == u_shape
                 for c_shape, u_shape in records["cfg_shapes"]
             )
+        )
+
+
+    def test_guidance_zero_does_not_create_or_forward_unconditional_cache(self):
+        records = _install_mock_decode(self)
+
+        output, stats = _decode(
+            use_cache=True,
+            policy="shared",
+            guidance_scale=0.0,
+        )
+
+        self.assertTrue(torch.equal(output, _expected_generated()))
+        self.assertEqual(stats["n_blocks"], 3)
+        self.assertEqual(records["cache_creations"], 1)
+        self.assertFalse(
+            any(record["role"] == "u" for record in records["forward"])
         )
 
 

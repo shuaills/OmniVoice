@@ -320,8 +320,213 @@ def test_validate_generation_locks_legacy_baseline_meta_shape(tmp_path: Path) ->
         REPORT.validate_generation(args)
 
 
+def test_token_decode_timing_excludes_warmups_and_summarizes_post_warmup_rows() -> None:
+    meta = {
+        "utt-0": {
+            "token_decode_seconds": 9.0,
+            "token_decode_rtf": 0.9,
+            "timing_warmup": True,
+        },
+        "utt-1": {
+            "token_decode_seconds": 8.0,
+            "token_decode_rtf": 0.8,
+            "timing_warmup": True,
+        },
+        "utt-2": {
+            "token_decode_seconds": 1.0,
+            "token_decode_rtf": 0.1,
+            "timing_warmup": False,
+        },
+        "utt-3": {
+            "token_decode_seconds": 2.0,
+            "token_decode_rtf": 0.2,
+            "timing_warmup": False,
+        },
+        "utt-4": {
+            "token_decode_seconds": 5.0,
+            "token_decode_rtf": 0.5,
+            "timing_warmup": False,
+        },
+    }
+
+    summary = REPORT.summarize_token_decode_timing(meta)
+
+    assert summary == {
+        "timed_count": 3,
+        "token_decode_seconds_mean": pytest.approx(8 / 3),
+        "token_decode_seconds_median": 2.0,
+        "token_decode_seconds_p95": 5.0,
+        "token_decode_rtf_mean": pytest.approx(0.8 / 3),
+        "token_decode_rtf_median": 0.2,
+        "token_decode_rtf_p95": 0.5,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("token_decode_seconds", 0.0),
+        ("token_decode_seconds", float("inf")),
+        ("token_decode_rtf", -0.1),
+        ("token_decode_rtf", "0.1"),
+        ("timing_warmup", 1),
+    ],
+)
+def test_token_decode_timing_fails_closed_on_invalid_values(
+    field: str, value: object
+) -> None:
+    row = {
+        "token_decode_seconds": 1.0,
+        "token_decode_rtf": 0.1,
+        "timing_warmup": False,
+    }
+    row[field] = value
+
+    with pytest.raises(ValueError, match="invalid token decode timing"):
+        REPORT.summarize_token_decode_timing({"utt-0": row})
+
+
+def test_token_decode_timing_is_all_or_none_and_old_metadata_is_compatible() -> None:
+    assert REPORT.summarize_token_decode_timing({"utt-0": {"frames": 20}}) is None
+
+    with pytest.raises(ValueError, match="partial token decode timing"):
+        REPORT.summarize_token_decode_timing(
+            {
+                "utt-0": {
+                    "token_decode_seconds": 1.0,
+                    "token_decode_rtf": 0.1,
+                    "timing_warmup": False,
+                },
+                "utt-1": {"frames": 20},
+            }
+        )
+
+
+def test_validate_generation_requires_one_timing_warmup_per_shard(
+    tmp_path: Path,
+) -> None:
+    tsv, jsonl, _ = make_input_fixture(tmp_path, count=4)
+    wav_dir = tmp_path / "timed-wavs"
+    wav_dir.mkdir()
+    for shard in range(2):
+        (wav_dir / f"failures_shard{shard}.jsonl").write_text("")
+        rows = []
+        for index in range(shard, 4, 2):
+            utt_id = f"utt-{index}"
+            (wav_dir / f"{utt_id}.wav").write_bytes(b"wav")
+            rows.append(
+                {
+                    "utt_id": utt_id,
+                    "frames": 20,
+                    "eos": True,
+                    "silence_stop": False,
+                    "silence_run_frames": 0,
+                    "stop_reason": "eos",
+                    "n_blocks": 1,
+                    "token_decode_seconds": 1.0 + index,
+                    "token_decode_rtf": 0.1 + index,
+                    "timing_warmup": index == shard,
+                }
+            )
+        (wav_dir / f"gen_meta_shard{shard}.jsonl").write_text(
+            "".join(json.dumps(row) + "\n" for row in rows)
+        )
+    args = argparse.Namespace(
+        tsv=str(tsv),
+        jsonl=str(jsonl),
+        expected_count=4,
+        num_shards=2,
+        arm="shared_g2",
+        lang="zh",
+        lang_policy="dataset",
+        prompt_contract="current",
+        cfg_unconditional_seed_policy="shared",
+        guidance_scale=2.0,
+        seed_base=20260707,
+        is_baseline=True,
+        wav_dir=str(wav_dir),
+        output=str(tmp_path / "timed-audit.json"),
+    )
+
+    REPORT.validate_generation(args)
+    audit = json.loads(Path(args.output).read_text())
+    assert audit["token_decode_timing"]["timed_count"] == 2
+    assert audit["token_decode_timing"]["token_decode_seconds_mean"] == 3.5
+
+    path = wav_dir / "gen_meta_shard1.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[0]["timing_warmup"] = False
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    with pytest.raises(ValueError, match="timing warmup IDs mismatch"):
+        REPORT.validate_generation(args)
+
+
+def test_summarize_arm_writes_validated_token_decode_timing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    summary_out = tmp_path / "summary.json"
+    monkeypatch.setattr(
+        REPORT.COMMON,
+        "summarize_arm",
+        lambda args: {
+            "arm": args.arm,
+            "lang": args.lang,
+            "count": args.expected_count,
+        },
+    )
+    monkeypatch.setattr(
+        REPORT.COMMON,
+        "parse_meta",
+        lambda meta_glob, failures_glob: {
+            "utt-0": {
+                "token_decode_seconds": 9.0,
+                "token_decode_rtf": 0.9,
+                "timing_warmup": True,
+            },
+            "utt-1": {
+                "token_decode_seconds": 2.0,
+                "token_decode_rtf": 0.2,
+                "timing_warmup": False,
+            },
+        },
+    )
+    args = argparse.Namespace(
+        arm="shared_g0",
+        lang="zh",
+        guidance_scale=0.0,
+        steps_per_block=16,
+        expected_count=2,
+        tsv="unused.tsv",
+        jsonl="unused.jsonl",
+        wav_dir="unused-wavs",
+        anchor_dir="unused-anchors",
+        wer_tsv="unused-wer.tsv",
+        sim_tsv="unused-sim.tsv",
+        meta_glob="unused-meta*.jsonl",
+        failures_glob="unused-failures*.jsonl",
+        per_utt_out="unused-per-utt.tsv",
+        summary_out=str(summary_out),
+        lang_policy="dataset",
+        prompt_contract="current",
+        cfg_unconditional_seed_policy="shared",
+        is_baseline=False,
+    )
+
+    REPORT.summarize_arm(args)
+
+    summary = json.loads(summary_out.read_text())
+    assert summary["timed_count"] == 1
+    assert summary["token_decode_seconds_mean"] == 2.0
+    assert summary["token_decode_rtf_p95"] == 0.2
+
+
 def summary_row(
-    tmp_path: Path, lang: str, arm: str, sims: tuple[float, float]
+    tmp_path: Path,
+    lang: str,
+    arm: str,
+    sims: tuple[float, float],
+    *,
+    timing: bool = False,
 ) -> Path:
     per_utt = tmp_path / f"{lang}-{arm}.tsv"
     with per_utt.open("w", newline="") as handle:
@@ -351,6 +556,18 @@ def summary_row(
         "max_blocks_count": 0,
         "per_utt_tsv": str(per_utt),
     }
+    if timing:
+        summary.update(
+            {
+                "timed_count": 1,
+                "token_decode_seconds_mean": 1.0,
+                "token_decode_seconds_median": 1.0,
+                "token_decode_seconds_p95": 1.0,
+                "token_decode_rtf_mean": 0.1,
+                "token_decode_rtf_median": 0.1,
+                "token_decode_rtf_p95": 0.1,
+            }
+        )
     path = tmp_path / f"{lang}-{arm}.json"
     path.write_text(json.dumps(summary))
     return path
@@ -399,3 +616,58 @@ def test_aggregate_reports_paired_sim_delta_against_baseline(tmp_path: Path) -> 
     assert zh_baseline["paired_sim_equal"] == 2
     assert zh_combined["paired_sim_delta_mean"] == pytest.approx(0.025)
     assert "paired SIM Δ mean" in output_md.read_text()
+    assert "token decode s mean" not in output_md.read_text()
+    assert "timed_count" not in output_tsv.read_text().splitlines()[0]
+
+
+def test_aggregate_includes_timing_in_json_tsv_and_markdown(tmp_path: Path) -> None:
+    arms = ["shared_g0", "shared_g2"]
+    summaries = [
+        str(summary_row(tmp_path, lang, arm, (0.60, 0.70), timing=True))
+        for lang in ("zh", "en")
+        for arm in arms
+    ]
+    output_tsv = tmp_path / "SUMMARY.tsv"
+    output_json = tmp_path / "SUMMARY.json"
+    output_md = tmp_path / "SUMMARY.md"
+
+    REPORT.aggregate(
+        argparse.Namespace(
+            summaries=summaries,
+            expected_arms=",".join(arms),
+            expected_languages="zh,en",
+            baseline_arm="shared_g2",
+            expected_count=2,
+            output_tsv=str(output_tsv),
+            output_json=str(output_json),
+            output_md=str(output_md),
+        )
+    )
+
+    payload = json.loads(output_json.read_text())
+    assert payload["rows"][0]["timed_count"] == 1
+    assert "timed_count" in output_tsv.read_text().splitlines()[0]
+    markdown = output_md.read_text()
+    assert "token decode s mean" in markdown
+    assert "token decode RTF p95" in markdown
+
+
+def test_aggregate_rejects_mixed_timing_contract(tmp_path: Path) -> None:
+    timed = summary_row(
+        tmp_path, "zh", "shared_g0", (0.60, 0.70), timing=True
+    )
+    untimed = summary_row(tmp_path, "zh", "shared_g2", (0.60, 0.70))
+
+    with pytest.raises(ValueError, match="mixed token decode timing contract"):
+        REPORT.aggregate(
+            argparse.Namespace(
+                summaries=[str(timed), str(untimed)],
+                expected_arms="shared_g0,shared_g2",
+                expected_languages="zh",
+                baseline_arm="shared_g2",
+                expected_count=2,
+                output_tsv=str(tmp_path / "SUMMARY.tsv"),
+                output_json=str(tmp_path / "SUMMARY.json"),
+                output_md=str(tmp_path / "SUMMARY.md"),
+            )
+        )

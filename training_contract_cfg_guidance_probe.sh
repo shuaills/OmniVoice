@@ -3,6 +3,8 @@
 # Calibrate compares the historical shared-reference guidance=2 control with
 # drop_ref guidance in {0.5, 1.0, 1.5, 2.0} on first100. Promote reruns only
 # that control and one explicitly selected drop_ref candidate on first300.
+# Shared_sweep holds the reference geometry fixed and scans guidance from zero
+# through the historical 2.0 setting on a first5 smoke or first100 evaluation.
 set -Eeuo pipefail
 
 # Repository and immutable model/data inputs. These intentionally match
@@ -41,10 +43,14 @@ SEED_BASE=20260707
 CALIBRATE_ARM_NAMES=(shared_g2 drop_ref_g0p5 drop_ref_g1 drop_ref_g1p5 drop_ref_g2)
 CALIBRATE_CFG_POLICIES=(shared drop_ref drop_ref drop_ref drop_ref)
 CALIBRATE_GUIDANCES=(2.0 0.5 1.0 1.5 2.0)
+SHARED_SWEEP_ARM_NAMES=(shared_g0 shared_g0p25 shared_g0p5 shared_g1 shared_g2)
+SHARED_SWEEP_CFG_POLICIES=(shared shared shared shared shared)
+SHARED_SWEEP_GUIDANCES=(0 0.25 0.5 1.0 2.0)
 BASELINE_ARM=shared_g2
 ARM_NAMES=()
 ARM_CFG_POLICIES=()
 ARM_GUIDANCES=()
+TIMING_ARGS=()
 
 RES=$RESULT_ROOT/$RUN_ID
 SHIM=$RES/shim
@@ -144,7 +150,24 @@ case "$MODE" in
     ARM_GUIDANCES=(2.0 "$PROMOTED_GUIDANCE")
     expected_arm_count=2
     ;;
-  *) die "MODE must be calibrate or promote, got $MODE" ;;
+  shared_sweep)
+    case "$EXPECTED_COUNT" in
+      5|100) ;;
+      *)
+        die "MODE=shared_sweep requires EXPECTED_COUNT in {5,100}, got $EXPECTED_COUNT"
+        ;;
+    esac
+    [[ -z $PROMOTED_GUIDANCE ]] || \
+      die "MODE=shared_sweep rejects PROMOTED_GUIDANCE; got $PROMOTED_GUIDANCE"
+    [[ $STEPS_PER_BLOCK == 16 ]] || \
+      die "MODE=shared_sweep requires STEPS_PER_BLOCK=16, got $STEPS_PER_BLOCK"
+    ARM_NAMES=("${SHARED_SWEEP_ARM_NAMES[@]}")
+    ARM_CFG_POLICIES=("${SHARED_SWEEP_CFG_POLICIES[@]}")
+    ARM_GUIDANCES=("${SHARED_SWEEP_GUIDANCES[@]}")
+    TIMING_ARGS+=(--measure-token-decode)
+    expected_arm_count=5
+    ;;
+  *) die "MODE must be calibrate, promote, or shared_sweep, got $MODE" ;;
 esac
 [[ ${#ARM_NAMES[@]} -eq $expected_arm_count ]] || \
   die "MODE=$MODE expected $expected_arm_count arms, got ${#ARM_NAMES[@]}"
@@ -160,6 +183,24 @@ for ((i = 0; i < ${#ARM_NAMES[@]}; i++)); do
       die "duplicate arm argv contract: ${ARM_NAMES[$j]} and ${ARM_NAMES[$i]}"
   done
 done
+
+IFS=, read -r -a GPU_ARRAY <<< "$GPU_IDS"
+for ((i = 0; i < ${#GPU_ARRAY[@]}; i++)); do
+  [[ ${GPU_ARRAY[$i]} =~ ^[0-9]+$ ]] || die "invalid GPU ID: ${GPU_ARRAY[$i]}"
+  for ((j = 0; j < i; j++)); do
+    [[ ${GPU_ARRAY[$i]} != "${GPU_ARRAY[$j]}" ]] || \
+      die "duplicate GPU ID: ${GPU_ARRAY[$i]}"
+  done
+done
+if [[ $MODE == shared_sweep ]]; then
+  ((${#GPU_ARRAY[@]} >= 2)) || \
+    die "MODE=shared_sweep requires at least two GPUs"
+  ((${#GPU_ARRAY[@]} < EXPECTED_COUNT)) || \
+    die "MODE=shared_sweep requires fewer GPU shards than EXPECTED_COUNT so post-warmup timing rows remain"
+else
+  ((${#GPU_ARRAY[@]} == 3)) || \
+    die "MODE=$MODE requires exactly three GPUs"
+fi
 
 require_dir "$C"
 require_dir "$MAIN"
@@ -183,16 +224,6 @@ for lang in zh en; do
   require_file "$(source_tsv_for_lang "$lang")"
   require_file "$(source_jsonl_for_lang "$lang")"
   require_dir "$(anchor_for_lang "$lang")"
-done
-
-IFS=, read -r -a GPU_ARRAY <<< "$GPU_IDS"
-((${#GPU_ARRAY[@]} == 3)) || die "GPU_IDS must provide exactly three GPUs"
-for ((i = 0; i < ${#GPU_ARRAY[@]}; i++)); do
-  [[ ${GPU_ARRAY[$i]} =~ ^[0-9]+$ ]] || die "invalid GPU ID: ${GPU_ARRAY[$i]}"
-  for ((j = 0; j < i; j++)); do
-    [[ ${GPU_ARRAY[$i]} != "${GPU_ARRAY[$j]}" ]] || \
-      die "duplicate GPU ID: ${GPU_ARRAY[$i]}"
-  done
 done
 
 # RESULT_ROOT may be shared by many jobs; the run directory must be new. A
@@ -231,7 +262,7 @@ base_real=$(realpath "$BASE")
 config_real=$(realpath "$CONFIG_SRC")
 v "CFG_GUIDANCE_PROBE_START run_id=$RUN_ID mode=$MODE commit=$commit time=$(date -u +%FT%TZ)"
 v "MATRIX arms=${ARM_NAMES[*]} langs=zh,en count=$EXPECTED_COUNT checkpoint=$ck_real gpu_ids=$GPU_IDS"
-v "FIXED prompt=$PROMPT_CONTRACT lang_policy=$LANG_POLICY steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 silence_stop=0 seed_base=$SEED_BASE"
+v "FIXED prompt=$PROMPT_CONTRACT lang_policy=$LANG_POLICY steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 eos_cfg_calibration=legacy silence_stop=0 seed_base=$SEED_BASE"
 
 cp "$config_real" "$SHIM/config.json"
 ln -s "$ck_real/model.safetensors" "$SHIM/model.safetensors"
@@ -271,8 +302,11 @@ done
   echo "expected_count=$EXPECTED_COUNT"
   echo "gpu_ids=$GPU_IDS"
   echo "generation_shards=${#GPU_ARRAY[@]}"
-  echo "seed_contract=torch.manual_seed($SEED_BASE + global_subset_row_index); identical ordered subset and three shards for every arm"
-  echo "fixed_contract=prompt=$PROMPT_CONTRACT lang_policy=$LANG_POLICY steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 silence_stop=0"
+  echo "seed_contract=torch.manual_seed($SEED_BASE + global_subset_row_index); identical ordered subset and shard count for every arm"
+  echo "fixed_contract=prompt=$PROMPT_CONTRACT lang_policy=$LANG_POLICY steps=$STEPS_PER_BLOCK block_size=$BLOCK_SIZE max_blocks=$MAX_BLOCKS dtype=bf16 eos_cfg_calibration=legacy silence_stop=0"
+  echo "token_decode_timing=$([[ ${#TIMING_ARGS[@]} -gt 0 ]] && echo enabled || echo disabled)"
+  echo "timing_scope=core token decode only; excludes model loading, reference encoding, codec decoding, and WAV I/O"
+  echo "first_packet_latency=not measured"
   echo "arms_begin"
   for ((i = 0; i < ${#ARM_NAMES[@]}; i++)); do
     echo "${ARM_NAMES[$i]} cfg_seed=${ARM_CFG_POLICIES[$i]} guidance=${ARM_GUIDANCES[$i]}"
@@ -348,6 +382,7 @@ for ((arm_index = 0; arm_index < ${#ARM_NAMES[@]}; arm_index++)); do
         --max-blocks "$MAX_BLOCKS" \
         --block-size "$BLOCK_SIZE" \
         --guidance-scale "$guidance" \
+        --eos-cfg-calibration legacy \
         --dtype bf16 \
         --prompt-contract "$PROMPT_CONTRACT" \
         --cfg-unconditional-seed-policy "$cfg_policy" \
@@ -355,6 +390,7 @@ for ((arm_index = 0; arm_index < ${#ARM_NAMES[@]}; arm_index++)); do
         --silence-stop-seconds 0 \
         --silence-match-codebooks "$SILENCE_MATCH_CODEBOOKS" \
         --shard "$shard/${#GPU_ARRAY[@]}" \
+        "${TIMING_ARGS[@]}" \
         > "$arm_dir/logs/gen_shard${shard}.log" 2>&1 &
       PIDS+=("$!")
     done

@@ -57,6 +57,31 @@ def test_cfg_guidance_runner_has_only_the_targeted_matrix() -> None:
     assert "--cfg-unconditional-seed-policy \"$cfg_policy\"" in script
 
 
+def test_shared_sweep_matrix_is_shared_reference_only_and_includes_zero() -> None:
+    script = WORKLOAD_PATH.read_text()
+
+    assert array(script, "SHARED_SWEEP_ARM_NAMES") == [
+        "shared_g0",
+        "shared_g0p25",
+        "shared_g0p5",
+        "shared_g1",
+        "shared_g2",
+    ]
+    assert array(script, "SHARED_SWEEP_CFG_POLICIES") == ["shared"] * 5
+    assert array(script, "SHARED_SWEEP_GUIDANCES") == [
+        "0",
+        "0.25",
+        "0.5",
+        "1.0",
+        "2.0",
+    ]
+    assert 'MODE=shared_sweep requires EXPECTED_COUNT in {5,100}' in script
+    assert 'MODE=shared_sweep rejects PROMOTED_GUIDANCE' in script
+    assert 'MODE=shared_sweep requires STEPS_PER_BLOCK=16' in script
+    assert '--eos-cfg-calibration legacy' in script
+    assert '--measure-token-decode' in script
+
+
 def test_cfg_guidance_runner_locks_subset_shards_seed_and_fixed_decode() -> None:
     script = WORKLOAD_PATH.read_text()
     canonical = CANONICAL_PATH.read_text()
@@ -65,7 +90,8 @@ def test_cfg_guidance_runner_locks_subset_shards_seed_and_fixed_decode() -> None
     assert 'MODE=calibrate requires EXPECTED_COUNT=100' in script
     assert 'MODE=promote requires EXPECTED_COUNT=300' in script
     assert "GPU_IDS=${GPU_IDS:-0,1,2}" in script
-    assert '${#GPU_ARRAY[@]} == 3' in script
+    assert 'MODE=$MODE requires exactly three GPUs' in script
+    assert 'MODE=shared_sweep requires at least two GPUs' in script
     assert "SEED_BASE=20260707" in script
     assert "global_subset_row_index" in script
     for name in ("MAIN", "E", "L", "DL", "BASE", "MODELS", "CK", "CONFIG_SRC", "TREND"):
@@ -108,7 +134,7 @@ def run_contract(
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"MODE": "unknown"}, "MODE must be calibrate or promote"),
+        ({"MODE": "unknown"}, "MODE must be calibrate, promote, or shared_sweep"),
         (
             {"MODE": "calibrate", "EXPECTED_COUNT": "300"},
             "MODE=calibrate requires EXPECTED_COUNT=100",
@@ -128,6 +154,26 @@ def run_contract(
         (
             {"MODE": "promote", "EXPECTED_COUNT": "300"},
             "MODE=promote requires PROMOTED_GUIDANCE",
+        ),
+        (
+            {"MODE": "shared_sweep", "EXPECTED_COUNT": "6"},
+            "MODE=shared_sweep requires EXPECTED_COUNT in {5,100}",
+        ),
+        (
+            {
+                "MODE": "shared_sweep",
+                "EXPECTED_COUNT": "5",
+                "PROMOTED_GUIDANCE": "0.5",
+            },
+            "MODE=shared_sweep rejects PROMOTED_GUIDANCE",
+        ),
+        (
+            {
+                "MODE": "shared_sweep",
+                "EXPECTED_COUNT": "5",
+                "STEPS_PER_BLOCK": "8",
+            },
+            "MODE=shared_sweep requires STEPS_PER_BLOCK=16",
         ),
         (
             {
@@ -194,6 +240,34 @@ def test_promote_matrix_contains_only_baseline_and_selected_candidate() -> None:
     assert "expected_arm_count=2" in script
 
 
+def test_shared_sweep_accepts_two_shards_but_legacy_modes_keep_three(
+    tmp_path: Path,
+) -> None:
+    missing_repo = tmp_path / "missing-repo"
+    shared = run_contract(
+        tmp_path,
+        MODE="shared_sweep",
+        EXPECTED_COUNT="5",
+        GPU_IDS="0,1",
+        C=str(missing_repo),
+    )
+    assert shared.returncode != 0
+    assert f"required directory not found: {missing_repo}" in shared.stderr
+
+    too_few = run_contract(
+        tmp_path,
+        MODE="shared_sweep",
+        EXPECTED_COUNT="5",
+        GPU_IDS="0",
+    )
+    assert too_few.returncode != 0
+    assert "MODE=shared_sweep requires at least two GPUs" in too_few.stderr
+
+    calibrate = run_contract(tmp_path, GPU_IDS="0,1")
+    assert calibrate.returncode != 0
+    assert "MODE=calibrate requires exactly three GPUs" in calibrate.stderr
+
+
 def test_cfg_guidance_runner_uses_same_reporter_and_scorers_with_paired_output() -> None:
     script = WORKLOAD_PATH.read_text()
 
@@ -221,6 +295,9 @@ def test_cfg_guidance_runner_is_fresh_fail_closed_and_self_terminating() -> None
     assert "wait_group \"generation arm=$arm lang=$lang\"" in script
     assert "wait_group \"scoring arm=$arm lang=$lang\"" in script
     assert "CFG_GUIDANCE_PROBE_DONE" in script
+    assert 'TIMING_ARGS+=(--measure-token-decode)' in script
+    assert 'timing_scope=core token decode only' in script
+    assert 'first_packet_latency=not measured' in script
     for forbidden in (
         "oms job submit",
         "oms pod console",
