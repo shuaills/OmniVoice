@@ -7,6 +7,7 @@ from unittest.mock import patch
 import torch
 
 from omnivoice.blockdiff import (
+    EOS_CFG_CALIBRATION_GUIDED,
     EOS_CFG_CALIBRATION_LEGACY,
     EOS_CFG_CALIBRATION_MASS_PRESERVING,
     EOS_CFG_CALIBRATION_RENORM,
@@ -170,6 +171,50 @@ def test_renorm_mode_normalizes_legacy_splice_without_changing_winners():
     )
 
 
+def test_guided_mode_uses_cfg_for_eos_and_normalizes_legal_cb0_classes():
+    conditional, unconditional = _logits()
+    conditional_lp, cfg_lp = _base_scores(
+        conditional, unconditional, guidance_scale=2.0
+    )
+    guided = _calibrate_blockwise_eos_log_probs(
+        cfg_lp,
+        conditional_lp,
+        MASK_ID,
+        EOS_ID,
+        EOS_CFG_CALIBRATION_GUIDED,
+    )
+
+    expected_cb0 = cfg_lp[:, 0:1].clone()
+    expected_cb0[..., MASK_ID] = -float("inf")
+    expected_cb0[..., EOS_ID + 1 :] = -float("inf")
+    expected_cb0 = torch.log_softmax(expected_cb0, dim=-1)
+    torch.testing.assert_close(
+        guided[:, 0:1], expected_cb0, rtol=0.0, atol=0.0
+    )
+    torch.testing.assert_close(
+        guided[:, 0].exp().sum(dim=-1),
+        torch.ones_like(guided[:, 0, :, 0]),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert not torch.equal(
+        guided[:, 0:1, :, EOS_ID],
+        conditional_lp[:, 0:1, :, EOS_ID],
+    )
+    assert torch.isneginf(guided[:, 1:, :, EOS_ID]).all()
+
+    legacy = _calibrate_blockwise_eos_log_probs(
+        cfg_lp,
+        conditional_lp,
+        MASK_ID,
+        EOS_ID,
+        EOS_CFG_CALIBRATION_LEGACY,
+    )
+    torch.testing.assert_close(
+        guided[:, 1:], legacy[:, 1:], rtol=0.0, atol=0.0
+    )
+
+
 def test_mass_preserving_mode_keeps_conditional_eos_and_cfg_non_eos_shape():
     conditional, unconditional = _logits()
     conditional_lp, cfg_lp = _base_scores(
@@ -226,6 +271,7 @@ def test_predictor_routes_explicit_experimental_modes_and_rejects_typos():
     )
     for mode in (
         EOS_CFG_CALIBRATION_RENORM,
+        EOS_CFG_CALIBRATION_GUIDED,
         EOS_CFG_CALIBRATION_MASS_PRESERVING,
     ):
         expected = _calibrate_blockwise_eos_log_probs(

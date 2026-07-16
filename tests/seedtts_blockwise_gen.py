@@ -36,7 +36,7 @@ ap.add_argument(
 ap.add_argument(
     '--eos-cfg-calibration',
     default='legacy',
-    choices=['legacy', 'renorm', 'mass_preserving'],
+    choices=['legacy', 'renorm', 'guided', 'mass_preserving'],
     help=(
         'EOS/CFG score calibration arm. legacy preserves historical mixed '
         'scores; the other choices are explicit experimental arms'

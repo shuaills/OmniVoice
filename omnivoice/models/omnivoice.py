@@ -126,8 +126,8 @@ class OmniVoiceGenerationConfig:
     num_step: int = 32
     guidance_scale: float = 2.0
     # Block-causal EOS/CFG score calibration. ``legacy`` is intentionally the
-    # compatibility default; ``renorm`` and ``mass_preserving`` are explicit
-    # experimental arms validated by omnivoice.blockdiff.
+    # compatibility default; ``renorm``, ``guided``, and ``mass_preserving``
+    # are explicit experimental arms validated by omnivoice.blockdiff.
     eos_cfg_calibration: str = "legacy"
     t_shift: float = 0.1
     layer_penalty_factor: float = 5.0

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Self-terminating three-arm EOS/CFG score-calibration probe for OMS.
+# Self-terminating four-arm EOS/CFG score-calibration probe for OMS.
 # Every arm uses the same checkpoint, ordered subset, random seed, prompt,
 # shared-reference CFG geometry, and decode settings.  Only EOS score
-# calibration changes: legacy, renorm, or mass_preserving.
+# calibration changes: legacy, renorm, guided, or mass_preserving.
 set -Eeuo pipefail
 
 C=${C:-/opt/gpfs/users/shuai/work/training-contract-probes/OmniVoice}
@@ -39,8 +39,8 @@ PROMPT_CONTRACT=current
 LANG_POLICY=dataset
 SEED_BASE=20260707
 
-ARM_NAMES=(legacy renorm mass_preserving)
-ARM_EOS_CFG_CALIBRATIONS=(legacy renorm mass_preserving)
+ARM_NAMES=(legacy renorm guided mass_preserving)
+ARM_EOS_CFG_CALIBRATIONS=(legacy renorm guided mass_preserving)
 BASELINE_ARM=legacy
 
 RES=$RESULT_ROOT/$RUN_ID
@@ -141,7 +141,7 @@ if [[ -n $UTT_IDS ]]; then
     die "UTT_IDS count must equal EXPECTED_COUNT: ids=${#UTT_ID_ARRAY[@]} count=$EXPECTED_COUNT"
 fi
 
-[[ ${#ARM_NAMES[@]} -eq 3 ]] || die "EOS calibration matrix must contain three arms"
+[[ ${#ARM_NAMES[@]} -eq 4 ]] || die "EOS calibration matrix must contain four arms"
 [[ ${#ARM_EOS_CFG_CALIBRATIONS[@]} -eq ${#ARM_NAMES[@]} ]] || \
   die "EOS calibration matrix length mismatch"
 

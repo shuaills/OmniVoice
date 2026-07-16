@@ -46,7 +46,7 @@ def test_generator_exposes_explicit_calibration_and_opt_in_trace() -> None:
 
     assert "'--eos-cfg-calibration'" in source
     assert "default='legacy'" in source
-    assert "choices=['legacy', 'renorm', 'mass_preserving']" in source
+    assert "choices=['legacy', 'renorm', 'guided', 'mass_preserving']" in source
     assert "'--eos-cfg-trace'" in source
     assert "'--generation-seed-index-map'" in source
     assert "action='store_true'" in source
@@ -92,13 +92,19 @@ def test_decoder_trace_is_optional_compact_and_records_actual_selection() -> Non
     )
 
 
-def test_campaign_is_a_locked_three_arm_paired_probe() -> None:
+def test_campaign_is_a_locked_four_arm_paired_probe() -> None:
     script = CAMPAIGN.read_text()
 
-    assert array(script, "ARM_NAMES") == ["legacy", "renorm", "mass_preserving"]
+    assert array(script, "ARM_NAMES") == [
+        "legacy",
+        "renorm",
+        "guided",
+        "mass_preserving",
+    ]
     assert array(script, "ARM_EOS_CFG_CALIBRATIONS") == [
         "legacy",
         "renorm",
+        "guided",
         "mass_preserving",
     ]
     assert "BASELINE_ARM=legacy" in script
