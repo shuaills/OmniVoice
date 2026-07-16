@@ -31,6 +31,7 @@ The [eos] machinery (vocab 1026, cb0-only semantics, mandatory CFG bypass)
 is inherited unchanged from omnivoice.blockdiff.
 """
 
+import hashlib
 import math
 import random
 from typing import Any, Dict, Optional, Tuple
@@ -150,7 +151,17 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                  turn_boundary_prompt_prob: float = 0.0,
                  eos_decouple_silence: bool = False,
                  eos_band_k: int = 1,
-                 silence_void_window: int = 32, **kwargs):
+                 silence_void_window: int = 32,
+                 cfg_branch_training: bool = False,
+                 cfg_branch_cond_ratio: float = 0.90,
+                 cfg_branch_shared_ratio: float = 0.05,
+                 cfg_branch_drop_ref_ratio: float = 0.05,
+                 cfg_branch_seed: int = 42,
+                 cfg_drop_ref_short_bucket_ratio: float = 0.5,
+                 cfg_drop_ref_q_min: int = 1,
+                 cfg_drop_ref_q_max: int = 32,
+                 cfg_drop_ref_short_q_max: int = 4,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
             raise ValueError(f"block_size must be positive, got {block_size}")
@@ -174,15 +185,142 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         self.eos_band_k = eos_band_k
         self.silence_void_window = silence_void_window
 
+        self.cfg_branch_training = cfg_branch_training
+        self.cfg_branch_cond_ratio = cfg_branch_cond_ratio
+        self.cfg_branch_shared_ratio = cfg_branch_shared_ratio
+        self.cfg_branch_drop_ref_ratio = cfg_branch_drop_ref_ratio
+        self.cfg_branch_seed = int(cfg_branch_seed)
+        self.cfg_drop_ref_short_bucket_ratio = cfg_drop_ref_short_bucket_ratio
+        self.cfg_drop_ref_q_min = cfg_drop_ref_q_min
+        self.cfg_drop_ref_q_max = cfg_drop_ref_q_max
+        self.cfg_drop_ref_short_q_max = cfg_drop_ref_short_q_max
+        if cfg_branch_training:
+            branch_ratios = (
+                cfg_branch_cond_ratio,
+                cfg_branch_shared_ratio,
+                cfg_branch_drop_ref_ratio,
+            )
+            if any(not math.isfinite(ratio) or ratio < 0 for ratio in branch_ratios):
+                raise ValueError("CFG branch ratios must be finite and non-negative")
+            if not math.isclose(sum(branch_ratios), 1.0, abs_tol=1e-9):
+                raise ValueError(
+                    "CFG branch ratios must sum to 1, got "
+                    f"{sum(branch_ratios)}"
+                )
+            if not 0.0 <= cfg_drop_ref_short_bucket_ratio <= 1.0:
+                raise ValueError(
+                    "cfg_drop_ref_short_bucket_ratio must be in [0, 1]"
+                )
+            if not 1 <= cfg_drop_ref_q_min <= cfg_drop_ref_q_max <= block_size:
+                raise ValueError(
+                    "CFG drop-ref q range must satisfy "
+                    f"1 <= min <= max <= block_size, got "
+                    f"[{cfg_drop_ref_q_min}, {cfg_drop_ref_q_max}] and "
+                    f"block_size={block_size}"
+                )
+            if cfg_drop_ref_short_q_max < 1:
+                raise ValueError("cfg_drop_ref_short_q_max must be >= 1")
+
+    def _cfg_rng(self, sample: Dict[str, Any]) -> random.Random:
+        """Per-sample CFG stream; never advances Python's global RNG."""
+        label = sample.get("label", {})
+        sample_key = label.get("id", label.get("idx"))
+        if sample_key is None:
+            raise ValueError(
+                "cfg_branch_training requires a stable label.id or label.idx"
+            )
+        material = f"{self.cfg_branch_seed}\0{sample_key}".encode("utf-8")
+        seed = int.from_bytes(hashlib.sha256(material).digest()[:16], "big")
+        return random.Random(seed)
+
+    def _choose_cfg_branch(self, rng: random.Random) -> str:
+        draw = rng.random()
+        if draw < self.cfg_branch_cond_ratio:
+            return "C"
+        if draw < self.cfg_branch_cond_ratio + self.cfg_branch_shared_ratio:
+            return "U_shared"
+        return "U_drop_ref"
+
+    def _choose_drop_ref_phase(
+        self, target_length: int, rng: random.Random
+    ) -> Dict[str, Any]:
+        """Choose bucket, q, then a legal cut using only the keyed RNG."""
+        if target_length < 2:
+            raise ValueError(
+                "U_drop_ref needs at least two acoustic frames so 1 <= S < T"
+            )
+        full_q = list(range(self.cfg_drop_ref_q_min, self.cfg_drop_ref_q_max + 1))
+        short_q = [q for q in full_q if q <= self.cfg_drop_ref_short_q_max]
+        requested_short = rng.random() < self.cfg_drop_ref_short_bucket_ratio
+        requested_pool = short_q if requested_short and short_q else full_q
+        requested_q = rng.choice(requested_pool)
+
+        legal_cuts = {q: [] for q in full_q}
+        for cut in range(1, target_length):
+            remainder = cut % self.block_size
+            q = self.block_size - remainder if remainder else self.block_size
+            if q in legal_cuts:
+                legal_cuts[q].append(cut)
+        legal_q = [q for q in full_q if legal_cuts[q]]
+        if not legal_q:
+            raise ValueError(
+                "U_drop_ref has no legal cut for configured q range "
+                f"[{self.cfg_drop_ref_q_min}, {self.cfg_drop_ref_q_max}] "
+                f"at T={target_length}"
+            )
+
+        actual_q = requested_q
+        rebucketed = not legal_cuts[requested_q]
+        if rebucketed:
+            short_mix = (
+                self.cfg_drop_ref_short_bucket_ratio if short_q else 0.0
+            )
+            weights = []
+            for q in legal_q:
+                weight = (1.0 - short_mix) / len(full_q)
+                if q in short_q:
+                    weight += short_mix / len(short_q)
+                weights.append(weight)
+            total_weight = sum(weights)
+            if total_weight == 0.0:
+                weights = [1.0] * len(legal_q)
+                total_weight = float(len(legal_q))
+            threshold = rng.random() * total_weight
+            cumulative = 0.0
+            actual_q = legal_q[-1]
+            for q, weight in zip(legal_q, weights):
+                cumulative += weight
+                if threshold < cumulative:
+                    actual_q = q
+                    break
+
+        cut = rng.choice(legal_cuts[actual_q])
+        return {
+            "requested_short_bucket": requested_short,
+            "requested_q": requested_q,
+            "actual_q": actual_q,
+            "prompt_cut": cut,
+            "rebucketed": rebucketed,
+        }
+
     def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         # --- official draw order (verbatim; global mask_ratio draw is kept
         # for stream stability but superseded by per-block ratios) ---
+        cfg_rng = None
         if "clean_start_token_idx" in sample["label"]:
-            drop_cond = False
+            branch = "C"
         else:
-            drop_cond = random.uniform(0, 1) < self.drop_cond_ratio
+            # Preserve the historical branch draw even when the new contract
+            # is enabled.  The keyed CFG stream selects the candidate branch;
+            # this discarded legacy draw keeps all later global draws aligned.
+            legacy_drop_cond = random.uniform(0, 1) < self.drop_cond_ratio
+            if self.cfg_branch_training:
+                cfg_rng = self._cfg_rng(sample)
+                branch = self._choose_cfg_branch(cfg_rng)
+            else:
+                branch = "U_drop_ref" if legacy_drop_cond else "C"
 
-        if drop_cond:
+        if branch == "U_drop_ref":
             prompt_ratio = 0.0
             drop_text = True
             use_language = False
@@ -194,6 +332,7 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             use_instruct = random.uniform(0, 1) < self.instruct_ratio
             if use_instruct and random.uniform(0, 1) < self.only_instruct_ratio:
                 prompt_ratio = 0.0
+            drop_text = branch == "U_shared"
 
         _ = random.uniform(*self.mask_ratio_range)  # superseded (see above)
 
@@ -225,34 +364,68 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             f"<|text_start|>{text}<|text_end|>", return_tensors="pt"
         ).input_ids.repeat(self.num_channels, 1)
 
-        audio_tokens = sample["audio_tokens"].long()
-        C, T = audio_tokens.shape
-
-        if "clean_start_token_idx" in sample["label"]:
-            prompt_length = sample["label"]["clean_start_token_idx"]
-        else:
-            prompt_length = int(T * prompt_ratio)
-            turns = sample["label"].get("turns")
-            if (
-                turns
-                and prompt_ratio > 0
-                and random.uniform(0, 1) < self.turn_boundary_prompt_prob
-            ):
-                bounds = []
-                for t in turns:
-                    try:
-                        b = int(round((t["start_s"] + t["duration_s"]) * 25))
-                    except (KeyError, TypeError):
-                        continue
-                    if 0.05 * T <= b <= 0.7 * T:
-                        bounds.append(min(b, T))
-                if bounds:
-                    prompt_length = random.choice(bounds)
-
         bs = self.block_size
-        n_blocks = T // bs + 1          # trailing block always reaches EOS fill
-        clean_len = (n_blocks - 1) * bs  # complete content blocks only
-        canvas_len = n_blocks * bs
+        source_audio_tokens = sample["audio_tokens"].long()
+        C, source_T = source_audio_tokens.shape
+        phase = None
+        ragged_q = None
+
+        if self.cfg_branch_training and branch == "U_drop_ref":
+            if cfg_rng is None:
+                raise AssertionError("U_drop_ref branch is missing its keyed RNG")
+            phase = self._choose_drop_ref_phase(source_T, cfg_rng)
+            source_prompt_length = phase["prompt_cut"]
+            ragged_q = phase["actual_q"]
+            # Physical reference removal: the target-only U timeline restarts
+            # at position zero, exactly like inference cfg_policy=drop_ref.
+            audio_tokens = source_audio_tokens[:, source_prompt_length:].clone()
+            prompt_length = 0
+        else:
+            audio_tokens = source_audio_tokens
+            if "clean_start_token_idx" in sample["label"]:
+                prompt_length = sample["label"]["clean_start_token_idx"]
+            else:
+                prompt_length = int(source_T * prompt_ratio)
+                turns = sample["label"].get("turns")
+                if (
+                    turns
+                    and prompt_ratio > 0
+                    and random.uniform(0, 1) < self.turn_boundary_prompt_prob
+                ):
+                    bounds = []
+                    for t in turns:
+                        try:
+                            b = int(
+                                round((t["start_s"] + t["duration_s"]) * 25)
+                            )
+                        except (KeyError, TypeError):
+                            continue
+                        if 0.05 * source_T <= b <= 0.7 * source_T:
+                            bounds.append(min(b, source_T))
+                    if bounds:
+                        prompt_length = random.choice(bounds)
+            if self.cfg_branch_training and branch == "U_shared":
+                if source_T < 2:
+                    raise ValueError("U_shared needs at least two acoustic frames")
+                prompt_length = min(max(prompt_length, 1), source_T - 1)
+            source_prompt_length = prompt_length
+
+        T = audio_tokens.shape[1]
+        if ragged_q is None:
+            n_blocks = T // bs + 1  # trailing block always reaches EOS fill
+            clean_len = (n_blocks - 1) * bs  # complete content blocks only
+            canvas_len = n_blocks * bs
+            block_bounds = [b * bs for b in range(n_blocks + 1)]
+        else:
+            # First target-only block has q columns.  Every later block has bs
+            # columns, and the canvas boundary is strictly after the target;
+            # landing exactly on a boundary therefore appends a pure EOS block.
+            block_bounds = [0, ragged_q]
+            while block_bounds[-1] <= T:
+                block_bounds.append(block_bounds[-1] + bs)
+            n_blocks = len(block_bounds) - 1
+            clean_len = block_bounds[-2]
+            canvas_len = block_bounds[-1]
         eos = block_eos_id(self.audio_mask_id)
 
         clean_copy = audio_tokens[:, :clean_len].clone()
@@ -269,7 +442,7 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             noisy_copy[:, T:eos_hi] = self.audio_mask_id
         noisy_labels = torch.full((C, canvas_len), -100, dtype=torch.long)
         for b in range(n_blocks):
-            lo, hi = b * bs, min((b + 1) * bs, T)
+            lo, hi = block_bounds[b], min(block_bounds[b + 1], T)
             m_lo = max(lo, prompt_length)
             if m_lo >= hi:
                 continue
@@ -359,11 +532,25 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                 torch.full((canvas_len,), TAG_NOISY, dtype=torch.int32),
             ]
         )
+        if ragged_q is None:
+            clean_block_idx = torch.arange(clean_len, dtype=torch.int32) // bs
+            noisy_block_idx = torch.arange(canvas_len, dtype=torch.int32) // bs
+        else:
+            def _ragged_ids(length):
+                positions = torch.arange(length, dtype=torch.int32)
+                return torch.where(
+                    positions < ragged_q,
+                    torch.zeros_like(positions),
+                    1 + (positions - ragged_q) // bs,
+                )
+
+            clean_block_idx = _ragged_ids(clean_len)
+            noisy_block_idx = _ragged_ids(canvas_len)
         block_idx = torch.cat(
             [
                 torch.full((P,), -1, dtype=torch.int32),
-                torch.arange(clean_len, dtype=torch.int32) // bs,
-                torch.arange(canvas_len, dtype=torch.int32) // bs,
+                clean_block_idx,
+                noisy_block_idx,
             ]
         )
 
@@ -378,7 +565,7 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
         if (loss_kind == KIND_IGNORE) .ne(labels == -100).any():
             raise AssertionError("loss_kind invariant violated: IGNORE <-> label==-100")
 
-        return {
+        output = {
             "input_ids": input_ids,
             "labels": labels,
             "audio_mask": audio_mask,
@@ -388,6 +575,32 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             "block_idx": block_idx,
             "loss_kind": loss_kind,
         }
+        if self.cfg_branch_training:
+            output.update(
+                {
+                    "cfg_branch": branch,
+                    "cfg_prompt_cut": source_prompt_length,
+                    "cfg_target_frames": source_T - source_prompt_length,
+                    "cfg_reference_frames": (
+                        0 if branch == "U_drop_ref" else source_prompt_length
+                    ),
+                    "cfg_reference_leak_tokens": (
+                        0 if branch == "U_drop_ref" else source_prompt_length * C
+                    ),
+                    "cfg_requested_q": (
+                        phase["requested_q"] if phase is not None else None
+                    ),
+                    "cfg_actual_q": (
+                        phase["actual_q"] if phase is not None else None
+                    ),
+                    "cfg_rebucketed": (
+                        phase["rebucketed"] if phase is not None else False
+                    ),
+                    "cfg_eos_band_width": eos_hi - T,
+                    "cfg_supervised_cells": int((labels != -100).sum().item()),
+                }
+            )
+        return output
 
 
 # ---------------------------------------------------------------------------

@@ -98,6 +98,20 @@ class TrainingConfig:
     # (needs 'turns' in labels; internal dataset has them). See blockdiff_dual.
     turn_boundary_prompt_prob: float = 0.0
 
+    # Opt-in CFG conditioning contract for block_scheme="dual".  Disabled is
+    # the exact historical 90/10 prompt-free drop_cond path.  Enabled replaces
+    # it with explicit C/U_shared/U_drop_ref sample branches; q controls the
+    # first target-only block width after physically dropping the reference.
+    cfg_branch_training: bool = False
+    cfg_branch_cond_ratio: float = 0.90
+    cfg_branch_shared_ratio: float = 0.05
+    cfg_branch_drop_ref_ratio: float = 0.05
+    cfg_branch_seed: Optional[int] = None
+    cfg_drop_ref_short_bucket_ratio: float = 0.5
+    cfg_drop_ref_q_min: int = 1
+    cfg_drop_ref_q_max: int = 32
+    cfg_drop_ref_short_q_max: int = 4
+
     # Independently normalized acoustic/EOS/void objective.  Coefficients are
     # neutral defaults; production recipes must carry their measured values.
     split_loss: bool = False

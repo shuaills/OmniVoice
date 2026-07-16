@@ -607,9 +607,10 @@ def build_dataloaders(
 
             logger.info(
                 "Block-diffusion DUAL (block-causal) training ENABLED "
-                "(block_size=%s, eos_band_k=%s)",
+                "(block_size=%s, eos_band_k=%s, cfg_branch_training=%s)",
                 config.block_size,
                 config.eos_band_k,
+                config.cfg_branch_training,
             )
             processor = OmniVoiceBlockDualSampleProcessor(
                 **processor_kwargs,
@@ -622,6 +623,29 @@ def build_dataloaders(
                 ),
                 eos_band_k=getattr(config, "eos_band_k", 1),
                 silence_void_window=getattr(config, "silence_void_window", 32),
+                cfg_branch_training=getattr(config, "cfg_branch_training", False),
+                cfg_branch_cond_ratio=getattr(
+                    config, "cfg_branch_cond_ratio", 0.90
+                ),
+                cfg_branch_shared_ratio=getattr(
+                    config, "cfg_branch_shared_ratio", 0.05
+                ),
+                cfg_branch_drop_ref_ratio=getattr(
+                    config, "cfg_branch_drop_ref_ratio", 0.05
+                ),
+                cfg_branch_seed=(
+                    config.seed
+                    if getattr(config, "cfg_branch_seed", None) is None
+                    else config.cfg_branch_seed
+                ),
+                cfg_drop_ref_short_bucket_ratio=getattr(
+                    config, "cfg_drop_ref_short_bucket_ratio", 0.5
+                ),
+                cfg_drop_ref_q_min=getattr(config, "cfg_drop_ref_q_min", 1),
+                cfg_drop_ref_q_max=getattr(config, "cfg_drop_ref_q_max", 32),
+                cfg_drop_ref_short_q_max=getattr(
+                    config, "cfg_drop_ref_short_q_max", 4
+                ),
             )
         else:
             from omnivoice.blockdiff import OmniVoiceBlockSampleProcessor
