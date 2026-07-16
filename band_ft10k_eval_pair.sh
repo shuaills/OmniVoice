@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-terminating paired first-300 evaluation for the bandctl/band4 10k checkpoints.
+# Self-terminating paired evaluation for the bandctl/band4 10k checkpoints.
 set -Eeuo pipefail
 
 C=${C:-/opt/gpfs/users/shuai/work/training-contract-probes/OmniVoice}
@@ -12,13 +12,13 @@ TREND=${TREND:-$MAIN/results_wer_trend}
 BANDCTL_CK=${BANDCTL_CK:-$C/exp/splitloss_ft10k_eos_bandctl_shuai-bandctl-ft10k-4g-v2/checkpoint-10000}
 BAND4_CK=${BAND4_CK:-$C/exp/splitloss_ft10k_eos_band4_shuai-band4-ft10k-4g-v2/checkpoint-10000}
 
-EXPECTED_COUNT=300
+EXPECTED_COUNT=${EXPECTED_COUNT:-100}
 GPU_IDS=${GPU_IDS:-0,1,2}
 STEPS_PER_BLOCK=16
 BLOCK_SIZE=32
 MAX_BLOCKS=24
 GUIDANCE_SCALE=2.0
-RESULT_ROOT=${RESULT_ROOT:-/opt/gpfs/users/shuai/work/training-contract-probes/results/band-ft10k-first300}
+RESULT_ROOT=${RESULT_ROOT:-/opt/gpfs/users/shuai/work/training-contract-probes/results/band-ft10k-first${EXPECTED_COUNT}}
 RUN_ID=${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-${OMS_JOB_ID:-${HOSTNAME:-host}-$$}}
 
 ARMS=(bandctl band4)
@@ -80,6 +80,8 @@ source_jsonl_for_lang() {
 anchor_for_lang() { echo "$E/results_endpoint/r1_$1"; }
 
 [[ $RUN_ID =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid RUN_ID: $RUN_ID"
+[[ $EXPECTED_COUNT =~ ^[0-9]+$ ]] || die "EXPECTED_COUNT must be a positive integer"
+((EXPECTED_COUNT >= 1 && EXPECTED_COUNT <= 300)) || die "EXPECTED_COUNT must be between 1 and 300"
 IFS=, read -r -a GPU_ARRAY <<< "$GPU_IDS"
 ((${#GPU_ARRAY[@]} == 3)) || die "GPU_IDS must contain exactly three GPUs"
 for ((i = 0; i < 3; i++)); do
@@ -148,7 +150,7 @@ for ((i = 0; i < ${#ARMS[@]}; i++)); do
   cp "$checkpoint/config.json" "$shim/config.json"
   ln -s "$(realpath "$checkpoint/model.safetensors")" "$shim/model.safetensors"
   ln -s "$(realpath "$BASE/audio_tokenizer")" "$shim/audio_tokenizer"
-  for file in tokenizer.json tokenizer_config.json chat_template.jinja; do
+  for file in tokenizer.json tokenizer_config.json train_config.json chat_template.jinja; do
     [[ ! -f "$checkpoint/$file" ]] || ln -s "$(realpath "$checkpoint/$file")" "$shim/$file"
   done
 done
@@ -196,6 +198,8 @@ done
 for ((arm_index = 0; arm_index < ${#ARMS[@]}; arm_index++)); do
   arm=${ARMS[$arm_index]}
   shim=$RES/shims/$arm
+  BASELINE_ARGS=()
+  [[ $arm != "$BASELINE_ARM" ]] || BASELINE_ARGS=(--is-baseline)
   for lang in zh en; do
     tsv=$RES/inputs/$lang/test.tsv
     jsonl=$RES/inputs/$lang/test.jsonl
@@ -214,7 +218,8 @@ for ((arm_index = 0; arm_index < ${#ARMS[@]}; arm_index++)); do
         --tsv "$tsv" --ckpt "$shim" --base "$shim" --out "$wav_dir" \
         --steps-per-block "$STEPS_PER_BLOCK" --max-blocks "$MAX_BLOCKS" \
         --block-size "$BLOCK_SIZE" --guidance-scale "$GUIDANCE_SCALE" \
-        --dtype bf16 --item-error-policy fail-at-end \
+        --dtype bf16 --prompt-contract current \
+        --cfg-unconditional-seed-policy shared --item-error-policy fail-at-end \
         --silence-stop-seconds 0 --silence-match-codebooks 2 \
         --shard "$shard/3" > "$arm_dir/logs/gen_shard${shard}.log" 2>&1 &
       PIDS+=("$!")
@@ -226,7 +231,7 @@ for ((arm_index = 0; arm_index < ${#ARMS[@]}; arm_index++)); do
       --num-shards 3 --arm "$arm" --lang "$lang" --lang-policy dataset \
       --prompt-contract current --cfg-unconditional-seed-policy shared \
       --guidance-scale "$GUIDANCE_SCALE" --wav-dir "$wav_dir" \
-      --output "$arm_dir/generation_audit.json" --is-baseline | tee -a "$VERDICT"
+      --output "$arm_dir/generation_audit.json" "${BASELINE_ARGS[@]}" | tee -a "$VERDICT"
 
     PIDS=()
     CUDA_VISIBLE_DEVICES=${GPU_ARRAY[0]} python omnivoice/eval/wer/seedtts.py \
@@ -242,7 +247,7 @@ for ((arm_index = 0; arm_index < ${#ARMS[@]}; arm_index++)); do
 
     python "$REPORTER" summarize-arm \
       --arm "$arm" --lang "$lang" --lang-policy dataset \
-      --prompt-contract current --cfg-unconditional-seed-policy shared --is-baseline \
+      --prompt-contract current --cfg-unconditional-seed-policy shared "${BASELINE_ARGS[@]}" \
       --guidance-scale "$GUIDANCE_SCALE" --steps-per-block "$STEPS_PER_BLOCK" \
       --expected-count "$EXPECTED_COUNT" --tsv "$tsv" --jsonl "$jsonl" \
       --wav-dir "$wav_dir" --anchor-dir "$(anchor_for_lang "$lang")" \
