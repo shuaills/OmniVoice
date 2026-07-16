@@ -41,7 +41,8 @@ for arm in control forced; do
     > "$OUT/logs/sim_${arm}.log" 2>&1
   score=$(grep -oE 'SIM-o score: [0-9.]+' "$OUT/logs/sim_${arm}.log" | tail -1)
   [[ -n $score ]] || { echo "SIM_${arm}=FAILED" | tee -a "$VERDICT"; exit 1; }
-  rows=$(($(wc -l < "$OUT/sim_${arm}.tsv") - 1))
+  rows=$(awk -F '\t' 'NR > 1 && NF >= 4 { count++ } END { print count + 0 }' \
+    "$OUT/sim_${arm}.tsv")
   echo "SIM_${arm}=$score rows=$rows" | tee -a "$VERDICT"
 done
 

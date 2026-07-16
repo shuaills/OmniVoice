@@ -61,3 +61,11 @@ Codex 交付 d61fd24（实现+本地 21 测全绿），集群 donor 环境复验
   their own self-terminating OMS job. The k=1 control and k=4 EOS-band 10k arms
   are queued as separate single-node 8xH100 jobs; neither launcher contains a
   guardian sleep or uses pod-console injection.
+- **Paired force-stop SIM, en first-300:** scoring the existing control and
+  1.0 s / first-two-codebook outputs gave SIM **0.631 -> 0.632**. The paired
+  per-utterance delta was mean **+0.000833**, median 0; 11 improved, 287 were
+  unchanged, and 2 worsened. This confirms that digital-silence trimming is a
+  decode safety net, not an explanation for the independent SIM gap. The
+  scoring-only OMS job `shuai-silence-paired-sim-v3` completed normally; raw
+  artifacts are under
+  `/opt/gpfs/users/shuai/work/silence-force-stop-campaign/results/pilot_en300_20260716/paired_sim_v1/`.
