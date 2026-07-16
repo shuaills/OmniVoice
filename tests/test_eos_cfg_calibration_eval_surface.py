@@ -189,7 +189,8 @@ def test_oms_entrypoint_runs_preflight_then_execs_campaign_without_guardian() ->
 
     assert "set -Eeuo pipefail" in script
     assert "RUN_EOS_CFG_TESTS=${RUN_EOS_CFG_TESTS:-1}" in script
-    assert "tests/test_block_eos_cfg_calibration.py" in script
+    assert "python scripts/eos_cfg_calibration_preflight.py" in script
+    assert "python tests/test_block_dual_cpu.py" in script
     assert 'exec bash "$C/training_contract_eos_cfg_calibration_probe.sh"' in script
     for forbidden in ("sleep infinity", "while true", "oms pod console"):
         assert forbidden not in script.lower()

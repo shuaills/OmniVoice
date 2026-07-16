@@ -199,6 +199,7 @@ for tracked in \
   eos_cfg_calibration_oms_entrypoint.sh \
   training_contract_eos_cfg_calibration_probe.sh \
   scripts/training_contract_probe_report.py \
+  scripts/eos_cfg_calibration_preflight.py \
   scripts/decode_sweep_report.py \
   tests/seedtts_blockwise_gen.py \
   omnivoice/blockdiff.py \
@@ -357,6 +358,7 @@ done
     eos_cfg_calibration_oms_entrypoint.sh \
     training_contract_eos_cfg_calibration_probe.sh \
     scripts/training_contract_probe_report.py \
+    scripts/eos_cfg_calibration_preflight.py \
     scripts/decode_sweep_report.py \
     tests/seedtts_blockwise_gen.py \
     omnivoice/blockdiff.py \

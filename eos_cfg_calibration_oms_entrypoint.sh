@@ -15,15 +15,10 @@ case "$RUN_EOS_CFG_TESTS" in
     source "$DL/.venv/bin/activate"
     export PYTHONPATH=$C
     cd "$C"
-    pytest -q \
-      tests/test_block_eos_cfg_calibration.py \
-      tests/test_eos_cfg_step_trace.py \
-      tests/test_legacy_fixed_canvas_guard.py \
-      tests/test_eos_cfg_calibration_eval_surface.py \
-      tests/test_training_contract_probe_report.py \
-      tests/test_block_dual_cpu.py \
-      tests/test_blockdiff_smoke.py \
-      tests/test_cfg_unconditional_seed_policy.py
+    python scripts/eos_cfg_calibration_preflight.py
+    python tests/test_block_dual_cpu.py
+    python tests/test_blockdiff_smoke.py
+    python tests/test_cfg_unconditional_seed_policy.py
     ;;
   *)
     echo "ERROR: RUN_EOS_CFG_TESTS must be 0 or 1, got $RUN_EOS_CFG_TESTS" >&2
