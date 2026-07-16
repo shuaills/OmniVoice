@@ -650,6 +650,9 @@ def test_aggregate_includes_timing_in_json_tsv_and_markdown(tmp_path: Path) -> N
     markdown = output_md.read_text()
     assert "token decode s mean" in markdown
     assert "token decode RTF p95" in markdown
+    table_rows = [line for line in markdown.splitlines() if line.startswith("| zh |")]
+    assert table_rows
+    assert all(len(line.split("|")) == 26 for line in table_rows)
 
 
 def test_aggregate_rejects_mixed_timing_contract(tmp_path: Path) -> None:

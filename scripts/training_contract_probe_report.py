@@ -690,7 +690,7 @@ def aggregate(args: argparse.Namespace) -> None:
         )
         if timing_enabled:
             line = (
-                line[:-1]
+                line
                 + f" {row['timed_count']} | "
                 f"{row['token_decode_seconds_mean']:.4f} | "
                 f"{row['token_decode_seconds_median']:.4f} | "
