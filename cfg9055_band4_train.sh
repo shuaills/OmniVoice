@@ -73,7 +73,7 @@ if expected not in actual.parents:
     raise SystemExit(f"refusing non-Shuai OmniVoice source: {actual}")
 PY
 
-python -m pytest -q tests/test_cfg_branch_training_contract.py
+python scripts/check_cfg9055_training_contract.py
 python scripts/check_checkpoint_vocab.py --train-config "$config"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
 
