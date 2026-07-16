@@ -38,18 +38,28 @@ Scheme ("current block" supervision, single copy):
 Inference CFG: ordinary classes use the official two-branch guidance; the
 [eos] class NEVER goes through CFG extrapolation (E1 scar: rare-class logit
 noise is amplified by ``c + s(c-u)``); its log-prob comes from the
-conditional branch alone. There is deliberately no config switch for this.
+conditional branch alone.  Historical mixed-score behavior remains the
+default; experimental score calibration is opt-in at decode time.
 """
 
 import math
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import torch
 
 from omnivoice.data.processor import OmniVoiceSampleProcessor
 
 EOS_OFFSET = 1
+
+EOS_CFG_CALIBRATION_LEGACY = "legacy"
+EOS_CFG_CALIBRATION_RENORM = "renorm"
+EOS_CFG_CALIBRATION_MASS_PRESERVING = "mass_preserving"
+_EOS_CFG_CALIBRATION_MODES = (
+    EOS_CFG_CALIBRATION_LEGACY,
+    EOS_CFG_CALIBRATION_RENORM,
+    EOS_CFG_CALIBRATION_MASS_PRESERVING,
+)
 
 
 def block_eos_id(audio_mask_id: int) -> int:
@@ -229,12 +239,79 @@ class OmniVoiceBlockSampleProcessor(OmniVoiceSampleProcessor):
 # ---------------------------------------------------------------------------
 
 
+def _calibrate_blockwise_eos_log_probs(
+    cfg_log_probs: torch.Tensor,
+    conditional_log_probs: torch.Tensor,
+    mask_id: int,
+    eos_id: int,
+    mode: str = EOS_CFG_CALIBRATION_LEGACY,
+) -> torch.Tensor:
+    """Splice conditional EOS scores into blockwise CFG scores.
+
+    ``legacy`` preserves the historical mixed-score behavior exactly: the
+    conditional EOS log-probability replaces the CFG EOS entry without a
+    subsequent normalization.  The two experimental modes make the score
+    scale explicit:
+
+    * ``renorm`` performs the legacy splice, then normalizes the EOS-capable
+      codebook-0 row over its legal classes.
+    * ``mass_preserving`` keeps conditional ``p(EOS)`` exactly and distributes
+      the remaining probability mass over codebook 0's legal non-EOS classes
+      in their CFG relative proportions.
+
+    EOS is legal only on codebook 0.  The mask class and classes after EOS are
+    structurally invalid on every codebook.  Experimental calibration is
+    deliberately limited to codebook 0; all other codebooks retain their
+    historical scores exactly so the A/B isolates the EOS-capable row.
+    """
+    if mode not in _EOS_CFG_CALIBRATION_MODES:
+        choices = ", ".join(_EOS_CFG_CALIBRATION_MODES)
+        raise ValueError(
+            f"unknown eos_cfg_calibration={mode!r}; expected one of: {choices}"
+        )
+
+    log_probs = cfg_log_probs.clone()
+    log_probs[..., mask_id] = -float("inf")
+    if log_probs.size(-1) > eos_id + 1:
+        log_probs[..., eos_id + 1 :] = -float("inf")
+
+    conditional_eos = conditional_log_probs[:, 0:1, :, eos_id]
+
+    # Historical surgery: EOS bypasses CFG on cb0 and is forbidden on all
+    # other codebooks.  In legacy mode the resulting mixed scores are
+    # deliberately left unnormalized for byte-compatible default output.
+    log_probs[:, 1:, :, eos_id] = -float("inf")
+    log_probs[:, 0:1, :, eos_id] = conditional_eos
+    if mode == EOS_CFG_CALIBRATION_LEGACY:
+        return log_probs
+    if mode == EOS_CFG_CALIBRATION_RENORM:
+        log_probs[:, 0:1] = torch.log_softmax(
+            log_probs[:, 0:1], dim=-1
+        )
+        return log_probs
+
+    # Normalize codebook 0's legal non-EOS CFG classes to recover their
+    # relative distribution after structural classes have been removed.
+    cb0_non_eos = cfg_log_probs[:, 0:1].clone()
+    cb0_non_eos[..., mask_id] = -float("inf")
+    cb0_non_eos[..., eos_id:] = -float("inf")
+    cb0_non_eos = torch.log_softmax(cb0_non_eos, dim=-1)
+
+    # log(1 - p_eos), evaluated stably from log(p_eos).  conditional_eos is a
+    # log-softmax result, so it is <= 0; p_eos == 1 correctly yields -inf.
+    non_eos_mass = torch.log(-torch.expm1(conditional_eos))
+    log_probs[:, 0:1] = cb0_non_eos + non_eos_mass.unsqueeze(-1)
+    log_probs[:, 0:1, :, eos_id] = conditional_eos
+    return log_probs
+
+
 def _predict_tokens_blockwise(model, c_logits, u_logits, gen_config):
     """Official scoring with [eos] surgery.
 
     Ordinary classes: official CFG (log-softmax extrapolation). [eos]:
-    conditional log-prob only (CFG bypass, mandatory), banned off cb0.
-    Mask id and anything past [eos] are banned everywhere.
+    conditional log-prob only (CFG bypass, mandatory), banned off cb0.  The
+    optional experimental ``gen_config.eos_cfg_calibration`` selects how the
+    mixed scores are calibrated; its absent/default value is ``legacy``.
     """
     from omnivoice.models.omnivoice import _filter_top_k, _gumbel_sample
 
@@ -252,12 +329,18 @@ def _predict_tokens_blockwise(model, c_logits, u_logits, gen_config):
     else:
         log_probs = c_log_probs
 
-    log_probs[..., mask_id] = -float("inf")
-    if log_probs.size(-1) > eos + 1:
-        log_probs[..., eos + 1 :] = -float("inf")
-    # [eos]: CFG bypass on cb0, hard ban elsewhere.
-    log_probs[:, 1:, :, eos] = -float("inf")
-    log_probs[:, 0:1, :, eos] = c_log_probs[:, 0:1, :, eos]
+    calibration = getattr(
+        gen_config,
+        "eos_cfg_calibration",
+        EOS_CFG_CALIBRATION_LEGACY,
+    )
+    log_probs = _calibrate_blockwise_eos_log_probs(
+        log_probs,
+        c_log_probs,
+        mask_id,
+        eos,
+        mode=calibration,
+    )
 
     if gen_config.class_temperature > 0.0:
         filtered = _filter_top_k(log_probs, ratio=0.1)

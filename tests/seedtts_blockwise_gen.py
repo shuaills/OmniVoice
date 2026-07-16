@@ -26,6 +26,31 @@ ap.add_argument('--block-size', type=int, default=32)
 ap.add_argument('--limit', type=int, default=0)
 ap.add_argument('--guidance-scale', type=float, default=2.0)
 ap.add_argument(
+    '--generation-seed-index-map',
+    default=None,
+    help=(
+        'optional JSON object mapping utterance id to its canonical source '
+        'row index; when provided every generated row must be present'
+    ),
+)
+ap.add_argument(
+    '--eos-cfg-calibration',
+    default='legacy',
+    choices=['legacy', 'renorm', 'mass_preserving'],
+    help=(
+        'EOS/CFG score calibration arm. legacy preserves historical mixed '
+        'scores; the other choices are explicit experimental arms'
+    ),
+)
+ap.add_argument(
+    '--eos-cfg-trace',
+    action='store_true',
+    help=(
+        'record a compact per-reveal-step EOS mass/margin/selection trace in '
+        'generation metadata; disabled by default'
+    ),
+)
+ap.add_argument(
     '--cfg-unconditional-seed-policy',
     default='shared',
     choices=['shared', 'drop_ref'],
@@ -133,6 +158,34 @@ rows = [r for k, r in enumerate(rows) if k % n == i]
 if args.limit:
     rows = rows[:args.limit]
 
+generation_seed_indices = None
+if args.generation_seed_index_map is not None:
+    with open(args.generation_seed_index_map, encoding='utf-8') as fh:
+        generation_seed_indices = json.load(fh)
+    if not isinstance(generation_seed_indices, dict):
+        raise ValueError('--generation-seed-index-map must contain a JSON object')
+    invalid_seed_indices = {
+        key: value
+        for key, value in generation_seed_indices.items()
+        if not isinstance(key, str)
+        or not isinstance(value, int)
+        or isinstance(value, bool)
+        or value < 0
+    }
+    if invalid_seed_indices:
+        raise ValueError(
+            'invalid canonical seed indices: '
+            f'{dict(list(invalid_seed_indices.items())[:5])}'
+        )
+    missing_seed_ids = [
+        row[0] for row in rows if row[0] not in generation_seed_indices
+    ]
+    if missing_seed_ids:
+        raise ValueError(
+            'generation seed index map is missing shard utterances: '
+            f'{missing_seed_ids[:5]}'
+        )
+
 os.makedirs(args.out, exist_ok=True)
 mdir = tempfile.mkdtemp(prefix='b2eval_model_')
 for f in ('model.safetensors', 'config.json'):
@@ -160,8 +213,14 @@ print(
     f'match_codebooks={args.silence_match_codebooks}',
     flush=True,
 )
+print(
+    f'[eos-cfg] calibration={args.eos_cfg_calibration} '
+    f'trace={args.eos_cfg_trace}',
+    flush=True,
+)
 gen = OmniVoiceGenerationConfig()
 gen.guidance_scale = args.guidance_scale
+gen.eos_cfg_calibration = args.eos_cfg_calibration
 bs = args.block_size
 
 done = skipped = failed = 0
@@ -199,7 +258,12 @@ for k, row in enumerate(rows):
         if isinstance(at, (list, tuple)):
             at = at[0]
         ref_toks = at.squeeze()
-        generation_seed = 20260707 + k * n + i
+        generation_seed_index = (
+            generation_seed_indices[utt_id]
+            if generation_seed_indices is not None
+            else k * n + i
+        )
+        generation_seed = 20260707 + generation_seed_index
         torch.manual_seed(generation_seed)
         resolved_ptext = prepare_reference_text(
             ptext,
@@ -220,6 +284,7 @@ for k, row in enumerate(rows):
             8,
             int(0.3 * model._estimate_target_tokens(ttext, None, None)),
         )
+        eos_cfg_trace = [] if args.eos_cfg_trace else None
         toks, stats = _decode_block_causal(
             model, prefix, gen, block_size=bs, max_blocks=args.max_blocks,
             num_step_per_block=args.steps_per_block, use_kv_cache=True,
@@ -227,7 +292,8 @@ for k, row in enumerate(rows):
             cfg_unconditional_seed_policy=cfg_unconditional_seed_policy,
             min_gen_frames=min_gen_frames,
             silence_run_frames=silence_run_frames,
-            silence_match_codebooks=args.silence_match_codebooks)
+            silence_match_codebooks=args.silence_match_codebooks,
+            eos_cfg_trace=eos_cfg_trace)
         _dd = os.environ.get('DUMP_TOKENS_DIR')
         if _dd:
             import numpy as _np
@@ -244,6 +310,11 @@ for k, row in enumerate(rows):
             )
         sf.write(outwav, wav_np, tsr)
         done += 1
+        seed_frames = int(ref_toks.size(1))
+        seed_frames_mod_block = seed_frames % bs
+        first_target_block_frames = (
+            bs - seed_frames_mod_block if seed_frames_mod_block else bs
+        )
         meta = {'utt_id': utt_id, 'frames': toks.size(1),
                 'eos': stats['stopped_by_eos'],
                 'silence_stop': stats['stopped_by_silence'],
@@ -253,13 +324,21 @@ for k, row in enumerate(rows):
                 'silence_run_frames': silence_run_frames,
                 'silence_match_codebooks': args.silence_match_codebooks,
                 'min_gen_frames': min_gen_frames,
-                'seed_frames': ref_toks.size(1),
+                'seed_frames': seed_frames,
+                'seed_frames_mod_block': seed_frames_mod_block,
+                'first_target_block_frames': first_target_block_frames,
+                'eos_cfg_calibration': args.eos_cfg_calibration,
+                'generation_seed_index': generation_seed_index,
+                'generation_seed_value': generation_seed,
                 'n_blocks': stats['n_blocks']}
+        if eos_cfg_trace is not None:
+            meta['eos_cfg_trace'] = eos_cfg_trace
         experimental_contract = (
             prepared_ref is not None
             or args.lang is not None
             or cfg_unconditional_seed_policy != 'shared'
             or args.guidance_scale != 2.0
+            or args.eos_cfg_calibration != 'legacy'
         )
         if prepared_ref is not None:
             meta.update({

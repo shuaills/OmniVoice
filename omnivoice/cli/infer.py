@@ -102,6 +102,12 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("--position_temperature", type=float, default=5.0)
     parser.add_argument("--class_temperature", type=float, default=0.0)
     parser.add_argument(
+        "--allow_block_checkpoint_fixed_canvas",
+        action="store_true",
+        help="Explicitly allow a block checkpoint to use the legacy fixed-canvas "
+        "decoder for comparison only. This bypasses learned EOS stopping.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default=None,
@@ -139,6 +145,9 @@ def main():
         layer_penalty_factor=args.layer_penalty_factor,
         position_temperature=args.position_temperature,
         class_temperature=args.class_temperature,
+        allow_block_checkpoint_fixed_canvas=(
+            args.allow_block_checkpoint_fixed_canvas
+        ),
     )
 
     sf.write(args.output, audios[0], model.sampling_rate)

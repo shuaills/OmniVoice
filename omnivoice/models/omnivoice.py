@@ -125,6 +125,10 @@ class VoiceClonePrompt:
 class OmniVoiceGenerationConfig:
     num_step: int = 32
     guidance_scale: float = 2.0
+    # Block-causal EOS/CFG score calibration. ``legacy`` is intentionally the
+    # compatibility default; ``renorm`` and ``mass_preserving`` are explicit
+    # experimental arms validated by omnivoice.blockdiff.
+    eos_cfg_calibration: str = "legacy"
     t_shift: float = 0.1
     layer_penalty_factor: float = 5.0
     position_temperature: float = 5.0
@@ -136,6 +140,11 @@ class OmniVoiceGenerationConfig:
     audio_chunk_threshold: float = 30.0
     pad_duration: float = 0.1
     fade_duration: float = 0.1
+    # Safety valve for an intentional apples-to-apples legacy comparison.
+    # Block checkpoints otherwise require their block-causal decoder because
+    # the fixed-canvas scorer bans every class at/after audio_mask_id, which
+    # includes the block [eos] class.
+    allow_block_checkpoint_fixed_canvas: bool = False
     # Elastic canvas (requires an elastic-migrated checkpoint; see
     # omnivoice/elastic.py). Off by default: official behaviour unchanged.
     elastic: bool = False
@@ -648,6 +657,43 @@ class OmniVoice(PreTrainedModel):
     # Inference API
     # -------------------------------------------------------------------
 
+    def _assert_block_only_generation_options(
+        self, gen_config: OmniVoiceGenerationConfig,
+    ) -> None:
+        calibration = getattr(gen_config, "eos_cfg_calibration", "legacy")
+        if calibration != "legacy":
+            raise ValueError(
+                "eos_cfg_calibration is a block-causal decoder option; "
+                "OmniVoice.generate() uses the legacy fixed-canvas decoder "
+                "and cannot apply it"
+            )
+
+    def _assert_legacy_fixed_canvas_allowed(
+        self, gen_config: OmniVoiceGenerationConfig
+    ) -> None:
+        """Reject block checkpoints on the legacy fixed-canvas decoder."""
+        block_migration_marker = getattr(
+            self.config, "block_migrated_from", None
+        ) is not None
+        audio_mask_id = getattr(self.config, "audio_mask_id", None)
+        audio_vocab_size = getattr(self.config, "audio_vocab_size", None)
+        has_block_eos_vocab = (
+            isinstance(audio_mask_id, int)
+            and isinstance(audio_vocab_size, int)
+            and audio_vocab_size == audio_mask_id + 2
+        )
+        if not (block_migration_marker or has_block_eos_vocab):
+            return
+        if getattr(gen_config, "allow_block_checkpoint_fixed_canvas", False):
+            return
+        raise RuntimeError(
+            "Refusing to run a block checkpoint through OmniVoice.generate()'s "
+            "legacy fixed-canvas decoder: that path masks the block [eos] "
+            "class and silently bypasses learned stopping. Use the block-causal "
+            "generation path instead. For an intentional fixed-canvas "
+            "comparison only, set allow_block_checkpoint_fixed_canvas=True."
+        )
+
     @torch.inference_mode()
     def generate(
         self,
@@ -719,6 +765,10 @@ class OmniVoice(PreTrainedModel):
                     (0 to disable).
                 fade_duration: Fade-in/out curve duration in seconds
                     (0 to disable).
+                allow_block_checkpoint_fixed_canvas: Explicitly permit a block
+                    checkpoint to use this legacy fixed-canvas decoder for an
+                    intentional comparison. Disabled by default because this
+                    path masks block EOS and cannot exercise learned stopping.
         Returns:
             ``audios`` a list of 1-D ``np.ndarray`` with shape ``(T,)`` and
             sampling rate consistent with the model's audio tokenizer
@@ -726,16 +776,19 @@ class OmniVoice(PreTrainedModel):
             ``soundfile.write("out.wav", audios[0], model.sampling_rate)``.
         """
 
-        if self.audio_tokenizer is None or self.text_tokenizer is None:
-            raise RuntimeError(
-                "Model is not loaded with audio/text tokenizers. Make sure you "
-                "loaded the model with OmniVoice.from_pretrained()."
-            )
         gen_config = (
             generation_config
             if generation_config is not None
             else OmniVoiceGenerationConfig.from_dict(kwargs)
         )
+        self._assert_block_only_generation_options(gen_config)
+        self._assert_legacy_fixed_canvas_allowed(gen_config)
+
+        if self.audio_tokenizer is None or self.text_tokenizer is None:
+            raise RuntimeError(
+                "Model is not loaded with audio/text tokenizers. Make sure you "
+                "loaded the model with OmniVoice.from_pretrained()."
+            )
 
         self.eval()
 

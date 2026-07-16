@@ -26,7 +26,15 @@ rows = []
 for ti, (lang, text) in enumerate(TEXTS):
     torch.manual_seed(20260707)
     t0 = time.time()
-    audios = model.generate(text=text, language=lang, num_step=32)
+    # This script intentionally measures a block checkpoint through the
+    # historical fixed-canvas decoder.  The opt-in makes that bypass explicit:
+    # it cannot exercise the block checkpoint's learned EOS stopping.
+    audios = model.generate(
+        text=text,
+        language=lang,
+        num_step=32,
+        allow_block_checkpoint_fixed_canvas=True,
+    )
     wall = time.time() - t0
     a0 = audios[0]
     wav_np = (a0.float().detach().cpu().numpy().reshape(-1)

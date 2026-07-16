@@ -218,6 +218,58 @@ def test_validate_generation_audits_nondefault_contract_and_seed(tmp_path: Path)
         REPORT.validate_generation(args)
 
 
+def test_validate_generation_preserves_filtered_source_seed_indices(
+    tmp_path: Path,
+) -> None:
+    tsv, jsonl, _ = make_input_fixture(tmp_path, count=2)
+    wav_dir = tmp_path / "filtered-wavs"
+    write_generation_contract(
+        wav_dir,
+        prompt_contract="current",
+        language="en",
+        cfg_policy="shared",
+        guidance=2.0,
+    )
+    seed_indices = {"utt-0": 76, "utt-1": 143}
+    seed_map = tmp_path / "seed-index-map.json"
+    seed_map.write_text(json.dumps(seed_indices))
+    for shard in range(2):
+        meta_path = wav_dir / f"gen_meta_shard{shard}.jsonl"
+        row = json.loads(meta_path.read_text())
+        source_index = seed_indices[row["utt_id"]]
+        row["generation_seed"] = 20260707 + source_index
+        row["generation_seed_index"] = source_index
+        row["generation_seed_value"] = 20260707 + source_index
+        meta_path.write_text(json.dumps(row) + "\n")
+
+    args = argparse.Namespace(
+        tsv=str(tsv),
+        jsonl=str(jsonl),
+        expected_count=2,
+        num_shards=2,
+        arm="renorm",
+        lang="en",
+        lang_policy="dataset",
+        prompt_contract="current",
+        cfg_unconditional_seed_policy="shared",
+        guidance_scale=2.0,
+        seed_base=20260707,
+        seed_index_map=str(seed_map),
+        is_baseline=False,
+        wav_dir=str(wav_dir),
+        output=str(tmp_path / "filtered-audit.json"),
+    )
+
+    REPORT.validate_generation(args)
+
+    meta_path = wav_dir / "gen_meta_shard0.jsonl"
+    row = json.loads(meta_path.read_text())
+    row["generation_seed_value"] += 1
+    meta_path.write_text(json.dumps(row) + "\n")
+    with pytest.raises(ValueError, match="canonical generation seed mismatch"):
+        REPORT.validate_generation(args)
+
+
 def test_validate_generation_locks_legacy_baseline_meta_shape(tmp_path: Path) -> None:
     tsv, jsonl, _ = make_input_fixture(tmp_path, count=2)
     wav_dir = tmp_path / "baseline-wavs"

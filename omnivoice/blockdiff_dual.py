@@ -560,6 +560,7 @@ def _decode_block_causal(
     silence_run_frames: int = 0,
     silence_match_codebooks: int = 2,
     cfg_unconditional_seed_policy: str = "shared",
+    eos_cfg_trace: Optional[list] = None,
 ):
     """Block-causal decode.  Returns (generated [C, G], stats).
 
@@ -583,7 +584,10 @@ def _decode_block_causal(
     parity.  Its cache and full-recompute implementations are still exact
     counterparts of each other.
     """
-    from omnivoice.blockdiff import _predict_tokens_blockwise
+    from omnivoice.blockdiff import (
+        _calibrate_blockwise_eos_log_probs,
+        _predict_tokens_blockwise,
+    )
     from omnivoice.models.omnivoice import _get_time_steps, _gumbel_sample
 
     device = model.device
@@ -607,6 +611,12 @@ def _decode_block_causal(
         raise ValueError(
             "cfg_unconditional_seed_policy must be 'shared' or 'drop_ref', "
             f"got {cfg_unconditional_seed_policy!r}"
+        )
+    if eos_cfg_trace is not None and float(
+        getattr(gen_config, "class_temperature", 0.0)
+    ) > 0.0:
+        raise ValueError(
+            "eos_cfg_trace counterfactuals require class_temperature=0"
         )
     drop_ref_from_unconditional = (
         use_cfg and cfg_unconditional_seed_policy == "drop_ref"
@@ -896,6 +906,24 @@ def _decode_block_causal(
             )
             scores = scores.masked_fill(cur_view != mask_id, -float("inf"))
             _, topk_idx = torch.topk(scores.flatten(), k)
+            if eos_cfg_trace is not None:
+                eos_cfg_trace.append(
+                    _eos_cfg_step_trace(
+                        c_cfg_logits.to(torch.float32),
+                        u_logits.to(torch.float32),
+                        gen_config,
+                        mask_id=mask_id,
+                        eos_id=eos,
+                        active_cb0=(cur_view[0, 0] == mask_id),
+                        pred_tokens=pred_tokens,
+                        queue_scores=scores,
+                        selected_flat_indices=topk_idx,
+                        block_index=b - seed_blocks,
+                        step_index=step,
+                        scheduled_positions=k,
+                        calibrate=_calibrate_blockwise_eos_log_probs,
+                    )
+                )
             flat = cur_view.flatten().clone()
             flat[topk_idx] = pred_tokens.flatten()[topk_idx]
             if drop_ref_from_unconditional:
@@ -997,6 +1025,225 @@ def _decode_block_causal(
             break
 
     return committed[:, seed_total:], stats
+
+
+def _finite_float(value: torch.Tensor) -> Optional[float]:
+    """Convert a scalar tensor to a JSON-safe float."""
+    result = float(value.item())
+    return result if math.isfinite(result) else None
+
+
+def _eos_cfg_step_trace(
+    c_logits: torch.Tensor,
+    u_logits: torch.Tensor,
+    gen_config,
+    *,
+    mask_id: int,
+    eos_id: int,
+    active_cb0: torch.Tensor,
+    pred_tokens: torch.Tensor,
+    queue_scores: torch.Tensor,
+    selected_flat_indices: torch.Tensor,
+    block_index: int,
+    step_index: int,
+    scheduled_positions: int,
+    calibrate,
+) -> Dict[str, Any]:
+    """Summarize EOS score calibration for one reveal step.
+
+    Only codebook 0 can emit EOS.  To keep traces compact, the scalar score
+    details describe the strongest actual EOS candidate when one exists, or
+    otherwise the active column with the strongest calibrated EOS margin.
+    Besides guided/legacy/calibrated row scores, the trace reconstructs the
+    legacy reveal queue with the *same* sampled position noise.  The function
+    is called only when tracing is explicitly enabled.
+    """
+    c_log_probs = torch.log_softmax(c_logits, dim=-1)
+    if gen_config.guidance_scale != 0.0:
+        u_log_probs = torch.log_softmax(u_logits, dim=-1)
+        cfg_log_probs = torch.log_softmax(
+            c_log_probs
+            + gen_config.guidance_scale * (c_log_probs - u_log_probs),
+            dim=-1,
+        )
+    else:
+        cfg_log_probs = c_log_probs
+
+    policy = getattr(gen_config, "eos_cfg_calibration", "legacy")
+    post_log_scores = calibrate(
+        cfg_log_probs,
+        c_log_probs,
+        mask_id,
+        eos_id,
+        mode=policy,
+    )
+    legacy_log_scores = calibrate(
+        cfg_log_probs,
+        c_log_probs,
+        mask_id,
+        eos_id,
+        mode="legacy",
+    )
+
+    # Match the legal class set used by the scorer before comparing margins.
+    legal_cfg = cfg_log_probs.clone()
+    legal_cfg[..., mask_id] = -float("inf")
+    if legal_cfg.size(-1) > eos_id + 1:
+        legal_cfg[..., eos_id + 1 :] = -float("inf")
+    guided_non_eos = legal_cfg[:, 0, :, :eos_id].amax(dim=-1)
+    legacy_non_eos = legacy_log_scores[:, 0, :, :eos_id].amax(dim=-1)
+    post_non_eos = post_log_scores[:, 0, :, :eos_id].amax(dim=-1)
+    guided_margin = legal_cfg[:, 0, :, eos_id] - guided_non_eos
+    legacy_margin = legacy_log_scores[:, 0, :, eos_id] - legacy_non_eos
+    post_margin = post_log_scores[:, 0, :, eos_id] - post_non_eos
+
+    legacy_confidence = legacy_log_scores.max(dim=-1).values
+    calibrated_confidence = post_log_scores.max(dim=-1).values
+    confidence_delta = legacy_confidence - calibrated_confidence
+    position_temperature = float(
+        getattr(gen_config, "position_temperature", 0.0)
+    )
+    if position_temperature > 0.0:
+        confidence_delta = confidence_delta / position_temperature
+    legacy_queue_scores = queue_scores + confidence_delta
+    k = int(selected_flat_indices.numel())
+    legacy_topk_indices = torch.topk(
+        legacy_queue_scores.flatten(), k
+    ).indices
+
+    active_columns = active_cb0.nonzero(as_tuple=True)[0]
+    class_eos = (pred_tokens[0, 0] == eos_id) & active_cb0
+    legacy_pred_tokens = legacy_log_scores.argmax(dim=-1)
+    legacy_class_eos = (legacy_pred_tokens[0, 0] == eos_id) & active_cb0
+    width = pred_tokens.size(-1)
+    selected_columns = sorted(
+        int(index.item()) % width
+        for index in selected_flat_indices
+        if int(index.item()) < width
+        and int(pred_tokens.flatten()[index].item()) == eos_id
+    )
+    legacy_selected_columns = sorted(
+        int(index.item()) % width
+        for index in legacy_topk_indices
+        if int(index.item()) < width
+        and int(legacy_pred_tokens.flatten()[index].item()) == eos_id
+    )
+    record: Dict[str, Any] = {
+        "block": int(block_index),
+        "step": int(step_index),
+        "policy": policy,
+        "scheduled": int(scheduled_positions),
+        "active_cb0": int(active_columns.numel()),
+        "class_eos": int(class_eos.sum().item()),
+        "legacy_class_eos": int(legacy_class_eos.sum().item()),
+        "selected_eos_cols": selected_columns,
+        "legacy_selected_eos_cols": legacy_selected_columns,
+    }
+    if active_columns.numel() == 0:
+        record.update(
+            {
+                "candidate_col": None,
+                "guided_eos_mass": None,
+                "conditional_eos_mass": None,
+                "legacy_eos_mass": None,
+                "post_eos_mass": None,
+                "legacy_total_mass": None,
+                "post_total_mass": None,
+                "guided_margin": None,
+                "legacy_margin": None,
+                "post_margin": None,
+                "legacy_confidence": None,
+                "post_confidence": None,
+                "queue_score": None,
+                "queue_cutoff": None,
+                "queue_rank": None,
+                "selected": False,
+                "legacy_queue_score": None,
+                "legacy_queue_cutoff": None,
+                "legacy_queue_rank": None,
+                "legacy_selected": False,
+            }
+        )
+        return record
+
+    eos_candidate_columns = class_eos.nonzero(as_tuple=True)[0]
+    if eos_candidate_columns.numel() > 0:
+        candidate_scores = queue_scores[0, 0, eos_candidate_columns]
+        candidate_col = int(
+            eos_candidate_columns[candidate_scores.argmax()].item()
+        )
+    else:
+        active_post_margin = post_margin[0, active_columns]
+        candidate_col = int(
+            active_columns[active_post_margin.argmax()].item()
+        )
+
+    candidate_flat_index = candidate_col
+
+    def queue_metrics(
+        candidate_scores: torch.Tensor, selected: torch.Tensor
+    ) -> Dict[str, Any]:
+        flat_scores = candidate_scores.flatten()
+        value = flat_scores[candidate_flat_index]
+        selected_values = flat_scores[selected]
+        finite_scores = flat_scores[torch.isfinite(flat_scores)]
+        return {
+            "score": _finite_float(value),
+            "cutoff": _finite_float(selected_values.min()),
+            "rank": int((finite_scores > value).sum().item()) + 1,
+            "selected": bool(
+                (selected == candidate_flat_index).any().item()
+            ),
+        }
+
+    actual_queue = queue_metrics(queue_scores, selected_flat_indices)
+    legacy_queue = queue_metrics(
+        legacy_queue_scores, legacy_topk_indices
+    )
+    post_column = post_log_scores[0, 0, candidate_col]
+    legacy_column = legacy_log_scores[0, 0, candidate_col]
+    record.update(
+        {
+            "candidate_col": candidate_col,
+            "candidate_is_class_eos": bool(class_eos[candidate_col].item()),
+            "guided_eos_mass": _finite_float(
+                legal_cfg[0, 0, candidate_col, eos_id].exp()
+            ),
+            "conditional_eos_mass": _finite_float(
+                c_log_probs[0, 0, candidate_col, eos_id].exp()
+            ),
+            "legacy_eos_mass": _finite_float(
+                legacy_column[eos_id].exp()
+            ),
+            "post_eos_mass": _finite_float(post_column[eos_id].exp()),
+            "legacy_total_mass": _finite_float(
+                legacy_column.exp().sum()
+            ),
+            "post_total_mass": _finite_float(post_column.exp().sum()),
+            "guided_margin": _finite_float(
+                guided_margin[0, candidate_col]
+            ),
+            "legacy_margin": _finite_float(
+                legacy_margin[0, candidate_col]
+            ),
+            "post_margin": _finite_float(post_margin[0, candidate_col]),
+            "legacy_confidence": _finite_float(
+                legacy_confidence[0, 0, candidate_col]
+            ),
+            "post_confidence": _finite_float(
+                calibrated_confidence[0, 0, candidate_col]
+            ),
+            "queue_score": actual_queue["score"],
+            "queue_cutoff": actual_queue["cutoff"],
+            "queue_rank": actual_queue["rank"],
+            "selected": actual_queue["selected"],
+            "legacy_queue_score": legacy_queue["score"],
+            "legacy_queue_cutoff": legacy_queue["cutoff"],
+            "legacy_queue_rank": legacy_queue["rank"],
+            "legacy_selected": legacy_queue["selected"],
+        }
+    )
+    return record
 
 
 def _forward_slices_mixed(model, ids, P, positions, attn4d):

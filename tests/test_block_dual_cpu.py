@@ -276,9 +276,54 @@ def test_gate3c_cache_equivalence_tiny():
               f"max |dlogit| = {dmax:.3e}")
 
 
+def test_eos_cfg_trace_does_not_change_decode_or_rng_state():
+    from omnivoice.models.omnivoice import OmniVoiceGenerationConfig
+
+    model = _tiny_model()
+    gen = OmniVoiceGenerationConfig(
+        guidance_scale=2.0,
+        eos_cfg_calibration="mass_preserving",
+        class_temperature=0.0,
+        position_temperature=1.5,
+    )
+    prefix = torch.randint(1, 200, (C, 6))
+
+    torch.manual_seed(20260716)
+    without_trace, stats_without = _decode_block_causal(
+        model,
+        prefix,
+        gen,
+        block_size=4,
+        max_blocks=2,
+        num_step_per_block=3,
+        use_kv_cache=False,
+    )
+    rng_without = torch.random.get_rng_state()
+
+    trace = []
+    torch.manual_seed(20260716)
+    with_trace, stats_with = _decode_block_causal(
+        model,
+        prefix,
+        gen,
+        block_size=4,
+        max_blocks=2,
+        num_step_per_block=3,
+        use_kv_cache=False,
+        eos_cfg_trace=trace,
+    )
+    rng_with = torch.random.get_rng_state()
+
+    assert trace
+    assert torch.equal(without_trace, with_trace)
+    assert stats_without == stats_with
+    assert torch.equal(rng_without, rng_with)
+
+
 if __name__ == "__main__":
     test_gate1_mask_rule()
     test_gate1b_processor_invariants()
     test_gate2_train_infer_consistency()
     test_gate3c_cache_equivalence_tiny()
+    test_eos_cfg_trace_does_not_change_decode_or_rng_state()
     print("ALL B2 CPU GATES PASSED")

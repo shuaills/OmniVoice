@@ -189,6 +189,37 @@ def validate_generation(args: argparse.Namespace) -> None:
     expected_ids, _, _ = COMMON.read_source_rows(
         Path(args.tsv), Path(args.jsonl), args.expected_count
     )
+    expected_seed_indices = {
+        utt_id: index for index, utt_id in enumerate(expected_ids)
+    }
+    seed_index_map_path = None
+    seed_index_map_arg = getattr(args, "seed_index_map", None)
+    if seed_index_map_arg is not None:
+        seed_index_map_path = Path(seed_index_map_arg).resolve()
+        try:
+            seed_index_map = json.loads(
+                seed_index_map_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            fail(f"invalid seed index map {seed_index_map_path}: {exc}")
+        if not isinstance(seed_index_map, dict):
+            fail(f"seed index map must be a JSON object: {seed_index_map_path}")
+        COMMON.require_exact_ids(
+            "seed index map", expected_ids, list(seed_index_map)
+        )
+        invalid_seed_indices = {
+            key: value
+            for key, value in seed_index_map.items()
+            if not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+        }
+        if invalid_seed_indices:
+            fail(
+                "seed index map values must be non-negative integers: "
+                f"{dict(list(invalid_seed_indices.items())[:5])}"
+            )
+        expected_seed_indices = seed_index_map
     wav_dir = Path(args.wav_dir).resolve()
     wav_ids = sorted(path.stem for path in wav_dir.glob("*.wav"))
     COMMON.require_exact_ids("generated wavs", expected_ids, wav_ids)
@@ -217,6 +248,22 @@ def validate_generation(args: argparse.Namespace) -> None:
         str(wav_dir / "failures_shard*.jsonl"),
     )
     COMMON.require_exact_ids("generation metadata", expected_ids, list(meta))
+    if seed_index_map_path is not None:
+        for utt_id in expected_ids:
+            expected_index = expected_seed_indices[utt_id]
+            row = meta[utt_id]
+            actual_index = row.get("generation_seed_index")
+            actual_value = row.get("generation_seed_value")
+            if actual_index != expected_index or actual_value != (
+                args.seed_base + expected_index
+            ):
+                fail(
+                    "canonical generation seed mismatch: "
+                    f"id={utt_id} expected_index={expected_index} "
+                    f"actual_index={actual_index} "
+                    f"expected_seed={args.seed_base + expected_index} "
+                    f"actual_seed={actual_value}"
+                )
     contract_fields = {
         "prompt_contract",
         "language",
@@ -251,7 +298,9 @@ def validate_generation(args: argparse.Namespace) -> None:
                 "language": expected_language,
                 "ref_text_punctuation": expected_punctuation,
                 "cfg_unconditional_seed_policy": args.cfg_unconditional_seed_policy,
-                "generation_seed": args.seed_base + index,
+                "generation_seed": (
+                    args.seed_base + expected_seed_indices[utt_id]
+                ),
             }
             mismatches = {
                 key: {"expected": value, "actual": row.get(key)}
@@ -305,6 +354,9 @@ def validate_generation(args: argparse.Namespace) -> None:
         "cfg_unconditional_seed_policy": args.cfg_unconditional_seed_policy,
         "guidance_scale": args.guidance_scale,
         "seed_base": args.seed_base,
+        "seed_index_map": (
+            str(seed_index_map_path) if seed_index_map_path is not None else None
+        ),
         "stop_reasons": stop_reasons,
         "wav_dir": str(wav_dir),
     }
@@ -539,6 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate.add_argument("--guidance-scale", required=True, type=float)
     validate.add_argument("--seed-base", default=20260707, type=int)
+    validate.add_argument("--seed-index-map")
     validate.add_argument("--is-baseline", action="store_true")
     validate.add_argument("--wav-dir", required=True)
     validate.add_argument("--output", required=True)
