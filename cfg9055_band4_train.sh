@@ -60,6 +60,27 @@ export PYTHONPATH="$root:/opt/gpfs/users/shuai/work/block-b2-perf/pylibs"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-8}
 
+run_config=$config
+if [[ -n ${GRAD_ACCUM_STEPS:-} ]]; then
+  if [[ ! $GRAD_ACCUM_STEPS =~ ^[1-9][0-9]*$ ]]; then
+    echo "GRAD_ACCUM_STEPS must be a positive integer" >&2
+    exit 2
+  fi
+  run_config=$(mktemp "${TMPDIR:-/tmp}/cfg9055-${mode}.XXXXXX.json")
+  trap 'rm -f "$run_config"' EXIT
+  python - "$config" "$run_config" "$GRAD_ACCUM_STEPS" <<'PY'
+import json
+import sys
+
+source, destination, gradient_accumulation_steps = sys.argv[1:]
+with open(source) as stream:
+    config = json.load(stream)
+config["gradient_accumulation_steps"] = int(gradient_accumulation_steps)
+with open(destination, "w") as stream:
+    json.dump(config, stream, indent=2)
+PY
+fi
+
 python - "$root" <<'PY'
 import pathlib
 import sys
@@ -74,7 +95,7 @@ if expected not in actual.parents:
 PY
 
 python scripts/check_cfg9055_training_contract.py
-python scripts/check_checkpoint_vocab.py --train-config "$config"
+python scripts/check_checkpoint_vocab.py --train-config "$run_config"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
 
 output_root=${OUTPUT_ROOT:-/opt/gpfs/users/shuai/experiments/cfg-band4-9055-20260717}
@@ -94,8 +115,9 @@ fi
   echo "source_root=$root"
   echo "source_commit=$source_commit"
   echo "source_author=$(git show -s --format='%an <%ae>' HEAD)"
-  echo "config=$config"
-  echo "config_sha256=$(sha256sum "$config" | awk '{print $1}')"
+  echo "config=$run_config"
+  echo "config_sha256=$(sha256sum "$run_config" | awk '{print $1}')"
+  echo "gradient_accumulation_steps=${GRAD_ACCUM_STEPS:-from_config}"
   echo "data_config_sha256=$(sha256sum examples/config/data_config_emilia_full_blockparity.json | awk '{print $1}')"
   echo "checkpoint=/opt/gpfs/users/shuai/work/block-loss-design/OmniVoice/exp/blockcausal_splitloss_emilia_300k_lx20/checkpoint-300000"
   echo "checkpoint_model_sha256=d72a01f60f01e2a6432779993981d2bdd2100266bdffc0a46a3cb957bf8e1908"
@@ -109,7 +131,7 @@ echo "CFG9055_START mode=$mode run_id=$run_id gpus=$num_gpus commit=$source_comm
 set +e
 accelerate launch --gpu_ids "$gpu_ids" --num_processes "$num_gpus" \
   -m omnivoice.cli.train \
-  --train_config "$config" \
+  --train_config "$run_config" \
   --data_config examples/config/data_config_emilia_full_blockparity.json \
   --output_dir "$output" \
   2>&1 | tee "$log_path"
