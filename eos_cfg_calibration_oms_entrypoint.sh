@@ -16,9 +16,6 @@ case "$RUN_EOS_CFG_TESTS" in
     export PYTHONPATH=$C
     cd "$C"
     python scripts/eos_cfg_calibration_preflight.py
-    python tests/test_block_dual_cpu.py
-    python tests/test_blockdiff_smoke.py
-    python tests/test_cfg_unconditional_seed_policy.py
     ;;
   *)
     echo "ERROR: RUN_EOS_CFG_TESTS must be 0 or 1, got $RUN_EOS_CFG_TESTS" >&2

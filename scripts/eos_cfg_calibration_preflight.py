@@ -67,9 +67,23 @@ def run_generation_routing_gates() -> None:
     print("PASS generation routing gates", flush=True)
 
 
+def run_decode_gates() -> None:
+    namespace = runpy.run_path(
+        str(ROOT / "tests" / "test_block_dual_cpu.py")
+    )
+    names = (
+        "test_gate3c_cache_equivalence_tiny",
+        "test_eos_cfg_trace_does_not_change_decode_or_rng_state",
+    )
+    for name in names:
+        namespace[name]()
+        print(f"PASS {name}", flush=True)
+
+
 def main() -> None:
     run_calibration_numeric_gates()
     run_generation_routing_gates()
+    run_decode_gates()
     print("ALL EOS CFG PREFLIGHT GATES PASSED", flush=True)
 
 
