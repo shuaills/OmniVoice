@@ -559,6 +559,7 @@ def _decode_block_causal(
     min_gen_frames: int = 0,
     silence_run_frames: int = 0,
     silence_match_codebooks: int = 2,
+    cfg_unconditional_seed_policy: str = "shared",
 ):
     """Block-causal decode.  Returns (generated [C, G], stats).
 
@@ -569,6 +570,18 @@ def _decode_block_causal(
     recompute path: every step rebuilds [prefix | committed | cur] with the
     dense rule mask -- geometrically identical, no cache. Gate 3 asserts the
     two produce identical tokens.
+
+    ``cfg_unconditional_seed_policy`` controls only the CFG-unconditional
+    branch. ``shared`` preserves the historical geometry exactly: reference
+    seed blocks (including a partial seed in the first current block) are
+    shared by the conditional and unconditional branches. ``drop_ref`` gives
+    the unconditional branch a separate, generated-only timeline: no full or
+    partial reference token enters its inputs/cache, and target positions start
+    at zero and advance only when generated target blocks are committed.  With
+    a partial reference, its first target-only block is intentionally short;
+    this is an experimental CFG geometry, not a claim of fixed-width training
+    parity.  Its cache and full-recompute implementations are still exact
+    counterparts of each other.
     """
     from omnivoice.blockdiff import _predict_tokens_blockwise
     from omnivoice.models.omnivoice import _get_time_steps, _gumbel_sample
@@ -590,6 +603,14 @@ def _decode_block_causal(
     )
     P = prefix.size(1)
     use_cfg = gen_config.guidance_scale != 0 and P > 0
+    if cfg_unconditional_seed_policy not in {"shared", "drop_ref"}:
+        raise ValueError(
+            "cfg_unconditional_seed_policy must be 'shared' or 'drop_ref', "
+            f"got {cfg_unconditional_seed_policy!r}"
+        )
+    drop_ref_from_unconditional = (
+        use_cfg and cfg_unconditional_seed_policy == "drop_ref"
+    )
 
     committed = torch.empty((C, 0), dtype=torch.long, device=device)
     seed_blocks, seed_rem, seed_total = 0, None, 0
@@ -600,6 +621,18 @@ def _decode_block_causal(
         seed_blocks = S // bs
         if seed_total > S:
             seed_rem = seed_audio[:, S:].to(device).long()
+
+    # The drop-ref CFG branch owns a generated-only history.  Block ids track
+    # decode commits rather than fixed-width frame buckets because a partial
+    # reference makes the first generated target block shorter than ``bs``.
+    # RoPE positions remain dense in target-frame time (0, 1, ...).  The first
+    # short block is an explicit experimental approximation, not fixed-width
+    # training parity; cache and recompute nevertheless use the same block id.
+    u_committed = torch.empty((C, 0), dtype=torch.long, device=device)
+    u_committed_block_ids = torch.empty(
+        (0,), dtype=torch.int32, device=device
+    )
+    u_next_block = 0
 
     caches = None
     if use_kv_cache:
@@ -617,7 +650,7 @@ def _decode_block_causal(
             Kc = caches["c"].get_seq_length()
             attn = torch.ones((1, 1, bs, Kc + bs), dtype=torch.bool, device=device)
             _forward_slices(model, blk_t, P + sb * bs + torch.arange(bs, device=device), attn, caches["c"])
-            if use_cfg:
+            if use_cfg and not drop_ref_from_unconditional:
                 Ku = caches["u"].get_seq_length()
                 attn_u = torch.ones((1, 1, bs, Ku + bs), dtype=torch.bool, device=device)
                 _forward_slices(model, blk_t, sb * bs + torch.arange(bs, device=device), attn_u, caches["u"])
@@ -653,6 +686,7 @@ def _decode_block_causal(
             t_shift=gen_config.t_shift,
         ).tolist()
         n_pre = seed_rem.size(1) if (b == seed_blocks and seed_rem is not None) else 0
+        u_cur_start = n_pre if drop_ref_from_unconditional else 0
         total_mask = (bs - n_pre) * C
         rem, sched = total_mask, []
         for step in range(num_step_per_block):
@@ -681,13 +715,35 @@ def _decode_block_causal(
                 _crop_cache(caches["c"], Kc)
                 if use_cfg:
                     Ku = caches["u"].get_seq_length()
-                    attn_u = torch.ones(
-                        (1, 1, bs, Ku + bs), dtype=torch.bool, device=device
-                    )
-                    u_pos = b * bs + torch.arange(bs, device=device)
-                    u_logits = _forward_slices(
-                        model, cur, u_pos, attn_u, caches["u"]
-                    )
+                    if drop_ref_from_unconditional:
+                        if Ku != u_committed.size(1):
+                            raise RuntimeError(
+                                "drop_ref unconditional cache/history mismatch: "
+                                f"cache={Ku}, generated={u_committed.size(1)}"
+                            )
+                        u_cur = cur[:, u_cur_start:]
+                        u_len = u_cur.size(1)
+                        attn_u = torch.ones(
+                            (1, 1, u_len, Ku + u_len),
+                            dtype=torch.bool,
+                            device=device,
+                        )
+                        u_pos = u_committed.size(1) + torch.arange(
+                            u_len, device=device
+                        )
+                        u_logits = _forward_slices(
+                            model, u_cur, u_pos, attn_u, caches["u"]
+                        )
+                    else:
+                        attn_u = torch.ones(
+                            (1, 1, bs, Ku + bs),
+                            dtype=torch.bool,
+                            device=device,
+                        )
+                        u_pos = b * bs + torch.arange(bs, device=device)
+                        u_logits = _forward_slices(
+                            model, cur, u_pos, attn_u, caches["u"]
+                        )
                     _crop_cache(caches["u"], Ku)
                 else:
                     u_logits = c_logits
@@ -725,20 +781,72 @@ def _decode_block_causal(
                 logits_full = _forward_slices_mixed(model, mixed, P, pos, attn)
                 c_logits = logits_full[:, :, L - bs :, :]
                 if use_cfg:
-                    sequ = torch.cat([committed, cur], dim=1)
-                    Lu = sequ.size(1)
-                    du = torch.zeros(Lu, dtype=torch.int32, device=device)
-                    tu = t[P:]
-                    blku = blk[P:]
-                    attnu = build_block_causal_attn_mask(du, tu, blku).to(device)
-                    posu = torch.cat(
-                        [
-                            torch.arange(committed.size(1), device=device),
-                            b * bs + torch.arange(bs, device=device),
-                        ]
-                    )
-                    logits_u = _forward_slices(model, sequ, posu, attnu)
-                    u_logits = logits_u[:, :, Lu - bs :, :]
+                    if drop_ref_from_unconditional:
+                        u_cur = cur[:, u_cur_start:]
+                        u_len = u_cur.size(1)
+                        sequ = torch.cat([u_committed, u_cur], dim=1)
+                        Lu = sequ.size(1)
+                        du = torch.zeros(
+                            Lu, dtype=torch.int32, device=device
+                        )
+                        tu = torch.cat(
+                            [
+                                torch.full(
+                                    (u_committed.size(1),),
+                                    TAG_CLEAN,
+                                    dtype=torch.int32,
+                                    device=device,
+                                ),
+                                torch.full(
+                                    (u_len,),
+                                    TAG_NOISY,
+                                    dtype=torch.int32,
+                                    device=device,
+                                ),
+                            ]
+                        )
+                        blku = torch.cat(
+                            [
+                                u_committed_block_ids,
+                                torch.full(
+                                    (u_len,),
+                                    u_next_block,
+                                    dtype=torch.int32,
+                                    device=device,
+                                ),
+                            ]
+                        )
+                        attnu = build_block_causal_attn_mask(
+                            du, tu, blku
+                        ).to(device)
+                        posu = torch.arange(Lu, device=device)
+                        logits_u = _forward_slices(
+                            model, sequ, posu, attnu
+                        )
+                        u_logits = logits_u[:, :, Lu - u_len :, :]
+                    else:
+                        sequ = torch.cat([committed, cur], dim=1)
+                        Lu = sequ.size(1)
+                        du = torch.zeros(
+                            Lu, dtype=torch.int32, device=device
+                        )
+                        tu = t[P:]
+                        blku = blk[P:]
+                        attnu = build_block_causal_attn_mask(
+                            du, tu, blku
+                        ).to(device)
+                        posu = torch.cat(
+                            [
+                                torch.arange(
+                                    committed.size(1), device=device
+                                ),
+                                b * bs + torch.arange(bs, device=device),
+                            ]
+                        )
+                        logits_u = _forward_slices(
+                            model, sequ, posu, attnu
+                        )
+                        u_logits = logits_u[:, :, Lu - bs :, :]
                 else:
                     u_logits = c_logits
 
@@ -755,9 +863,25 @@ def _decode_block_causal(
                     _neg = torch.finfo(c_logits.dtype).min
                     c_logits[0, 0, ban_cols, eos] = _neg
                     if u_logits is not c_logits:
-                        u_logits[0, 0, ban_cols, eos] = _neg
+                        u_ban_cols = (
+                            ban_cols[u_cur_start:]
+                            if drop_ref_from_unconditional
+                            else ban_cols
+                        )
+                        u_logits[0, 0, u_ban_cols, eos] = _neg
+
+            # Under drop_ref the CFG pair is evaluated only on aligned target
+            # columns.  The conditional reference prefix is neither padded nor
+            # represented in the unconditional input/cache.
+            c_cfg_logits = (
+                c_logits[:, :, u_cur_start:, :]
+                if drop_ref_from_unconditional
+                else c_logits
+            )
             pred_tokens, scores = _predict_tokens_blockwise(
-                model, c_logits.to(torch.float32), u_logits.to(torch.float32),
+                model,
+                c_cfg_logits.to(torch.float32),
+                u_logits.to(torch.float32),
                 gen_config,
             )
             if logit_trace is not None:
@@ -765,12 +889,19 @@ def _decode_block_causal(
             scores = scores - (layer_ids * gen_config.layer_penalty_factor)
             if gen_config.position_temperature > 0.0:
                 scores = _gumbel_sample(scores, gen_config.position_temperature)
-            cur_view = cur.unsqueeze(0)
+            cur_view = (
+                cur[:, u_cur_start:].unsqueeze(0)
+                if drop_ref_from_unconditional
+                else cur.unsqueeze(0)
+            )
             scores = scores.masked_fill(cur_view != mask_id, -float("inf"))
             _, topk_idx = torch.topk(scores.flatten(), k)
             flat = cur_view.flatten().clone()
             flat[topk_idx] = pred_tokens.flatten()[topk_idx]
-            cur = flat.view(C, bs)
+            if drop_ref_from_unconditional:
+                cur[:, u_cur_start:] = flat.view(C, bs - u_cur_start)
+            else:
+                cur = flat.view(C, bs)
 
         if use_kv_cache:
             # Commit: append the final block to the caches (clean geometry --
@@ -780,11 +911,51 @@ def _decode_block_causal(
             _ = _forward_slices(model, cur, cur_pos, attn, caches["c"])
             if use_cfg:
                 Ku = caches["u"].get_seq_length()
-                attn_u = torch.ones(
-                    (1, 1, bs, Ku + bs), dtype=torch.bool, device=device
-                )
-                u_pos = b * bs + torch.arange(bs, device=device)
-                _ = _forward_slices(model, cur, u_pos, attn_u, caches["u"])
+                if drop_ref_from_unconditional:
+                    if Ku != u_committed.size(1):
+                        raise RuntimeError(
+                            "drop_ref unconditional cache/history mismatch: "
+                            f"cache={Ku}, generated={u_committed.size(1)}"
+                        )
+                    u_cur = cur[:, u_cur_start:]
+                    u_len = u_cur.size(1)
+                    attn_u = torch.ones(
+                        (1, 1, u_len, Ku + u_len),
+                        dtype=torch.bool,
+                        device=device,
+                    )
+                    u_pos = u_committed.size(1) + torch.arange(
+                        u_len, device=device
+                    )
+                    _ = _forward_slices(
+                        model, u_cur, u_pos, attn_u, caches["u"]
+                    )
+                else:
+                    attn_u = torch.ones(
+                        (1, 1, bs, Ku + bs),
+                        dtype=torch.bool,
+                        device=device,
+                    )
+                    u_pos = b * bs + torch.arange(bs, device=device)
+                    _ = _forward_slices(
+                        model, cur, u_pos, attn_u, caches["u"]
+                    )
+
+        if use_cfg and drop_ref_from_unconditional:
+            u_cur = cur[:, u_cur_start:]
+            u_committed = torch.cat([u_committed, u_cur], dim=1)
+            u_committed_block_ids = torch.cat(
+                [
+                    u_committed_block_ids,
+                    torch.full(
+                        (u_cur.size(1),),
+                        u_next_block,
+                        dtype=torch.int32,
+                        device=device,
+                    ),
+                ]
+            )
+            u_next_block += 1
 
         committed = torch.cat([committed, cur], dim=1)
         stats["n_blocks"] = b + 1
