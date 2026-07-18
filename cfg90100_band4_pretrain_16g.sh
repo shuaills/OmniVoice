@@ -438,6 +438,13 @@ PY
   fi
 fi
 
+{
+  echo "finished_utc=$(date -u +%FT%TZ)"
+  echo "node0_rc=$node_rc"
+  echo "node1_rc=$peer_rc"
+  echo "rc=$rc"
+} >> "$manifest"
+
 if [[ $rc -eq 0 ]]; then
   {
     echo "contract=cfg90100-band4-16g"
@@ -451,11 +458,5 @@ if [[ $rc -eq 0 ]]; then
   mv "$pass_file.tmp" "$pass_file"
 fi
 
-{
-  echo "finished_utc=$(date -u +%FT%TZ)"
-  echo "node0_rc=$node_rc"
-  echo "node1_rc=$peer_rc"
-  echo "rc=$rc"
-} >> "$manifest"
 echo "CFG90100_16G_EXIT mode=$mode run_id=$run_id rc=$rc time=$(date -u +%FT%TZ)" | tee -a "$log_path"
 exit "$rc"
