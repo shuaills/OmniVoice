@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 
 CONFIG_DIR = ROOT / "examples/config"
 REFERENCE = CONFIG_DIR / "train_config_cfg90100_band4_300k.json"
+BUILDER = ROOT / "omnivoice/training/builder.py"
 CONFIGS = {
     "base": CONFIG_DIR / "train_config_cfg90100_band4_perf8_base.json",
     "nogc": CONFIG_DIR / "train_config_cfg90100_band4_perf8_nogc.json",
@@ -88,6 +89,13 @@ class ReceiptContractTest(unittest.TestCase):
     def test_global_batch_contracts(self):
         self.assertEqual(8 * self.configs["base"]["batch_tokens"], 125184)
         self.assertEqual(16 * self.configs["perf16_nogc"]["batch_tokens"], 125184)
+
+    def test_runtime_axes_are_forced_to_visible_output(self):
+        builder = BUILDER.read_text()
+        self.assertIn("def _emit_perf_contract", builder)
+        self.assertIn("print(message, flush=True)", builder)
+        self.assertIn('f"active={gradient_checkpointing_active}"', builder)
+        self.assertIn('f"PERF: balanced packing window={balanced_window}"', builder)
 
     @unittest.skipIf(PackingIterableDataset is None, "OmniVoice runtime dependencies unavailable")
     def test_balanced_packer_conserves_samples_and_capacity(self):

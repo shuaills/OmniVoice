@@ -58,6 +58,13 @@ from omnivoice.training.config import TrainingConfig
 logger = logging.getLogger(__name__)
 
 
+def _emit_perf_contract(message: str) -> None:
+    """Make runtime performance axes visible even before logging is configured."""
+    logger.info(message)
+    if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+        print(message, flush=True)
+
+
 _REQUIRED_TEXT_SPECIAL_TOKENS = (
     "<|denoise|>",
     "<|lang_start|>",
@@ -439,9 +446,9 @@ def build_model_and_tokenizer(
             f"configured={config.perf_grad_checkpoint} "
             f"active={gradient_checkpointing_active}"
         )
-    logger.info(
-        "PERF: gradient checkpointing active=%s",
-        gradient_checkpointing_active,
+    _emit_perf_contract(
+        "PERF: gradient checkpointing "
+        f"active={gradient_checkpointing_active}"
     )
 
     if config.perf_flex_bf16_qkv:
@@ -703,7 +710,7 @@ def build_dataloaders(
 
     if use_packing:
         balanced_window = getattr(config, "perf_balanced_packing", 0)
-        logger.info("PERF: balanced packing window=%s", balanced_window)
+        _emit_perf_contract(f"PERF: balanced packing window={balanced_window}")
         train_dataset = PackingIterableDataset(
             raw_train_ds,
             processor,
