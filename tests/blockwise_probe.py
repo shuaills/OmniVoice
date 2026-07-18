@@ -96,9 +96,23 @@ class ForwardTimer:
             self.calls.append((attn4d.shape[-1], True, time.time() - t0))
             return out
 
-        def fs(model, ids, positions, attn4d, past_key_values=None):
+        def fs(
+            model,
+            ids,
+            positions,
+            attn4d,
+            past_key_values=None,
+            first_prev_ids=None,
+        ):
             t0 = time.time()
-            out = self._fs(model, ids, positions, attn4d, past_key_values)
+            out = self._fs(
+                model,
+                ids,
+                positions,
+                attn4d,
+                past_key_values,
+                first_prev_ids=first_prev_ids,
+            )
             is_cond = past_key_values is None or past_key_values is self.cond_cache
             self.calls.append((attn4d.shape[-1], is_cond, time.time() - t0))
             return out

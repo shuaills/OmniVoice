@@ -180,6 +180,23 @@ class PackingDataCollator:
             )
             return_list["loss_weights"] = loss_weights.unsqueeze(0)  # [1, C, L]
 
+        _has_markov_prev = ["markov_prev_ids" in s for s in processed_samples]
+        if any(_has_markov_prev) and not all(_has_markov_prev):
+            raise AssertionError(
+                "mixed markov_prev_ids presence in one pack: "
+                f"{sum(_has_markov_prev)}/{len(_has_markov_prev)}"
+            )
+        if all(_has_markov_prev):
+            markov_prev_ids = torch.cat(
+                [s["markov_prev_ids"] for s in processed_samples], dim=1
+            )
+            markov_prev_ids = torch.nn.functional.pad(
+                markov_prev_ids,
+                pad=(0, pad_length),
+                value=self.processor.audio_mask_id,
+            )
+            return_list["markov_prev_ids"] = markov_prev_ids.unsqueeze(0)
+
         document_ids_list = []
 
         for i, s in enumerate(processed_samples):

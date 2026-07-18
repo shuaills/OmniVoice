@@ -100,7 +100,12 @@ def _install_mock_decode(patches):
         cache.length += text_ids.size(1)
 
     def forward_slices(
-        model, ids, positions, attn4d, past_key_values=None
+        model,
+        ids,
+        positions,
+        attn4d,
+        past_key_values=None,
+        first_prev_ids=None,
     ):
         role = "recompute"
         before = None
@@ -119,6 +124,11 @@ def _install_mock_decode(patches):
                 "before": before,
                 "ids": ids.detach().clone(),
                 "positions": positions.detach().clone(),
+                "first_prev_ids": (
+                    None
+                    if first_prev_ids is None
+                    else first_prev_ids.detach().clone()
+                ),
             }
         )
         return logits_for_positions(positions)
@@ -233,6 +243,21 @@ class TestCfgUnconditionalSeedPolicy(unittest.TestCase):
             [int(r["positions"][0]) for r in u_calls],
             [0, 4, 4, 8, 8] * 2,
         )
+        _, seed = _inputs()
+        generated = _expected_generated()
+        expected_anchors = [
+            None,
+            seed[:, 3],
+            None,
+            generated[:, 1],
+            None,
+        ] * 2
+        for record, expected_anchor in zip(u_calls, expected_anchors):
+            actual_anchor = record["first_prev_ids"]
+            if expected_anchor is None:
+                self.assertIsNone(actual_anchor)
+            else:
+                self.assertTrue(torch.equal(actual_anchor, expected_anchor))
         self.assertTrue(
             all(
                 c_shape == u_shape
@@ -286,6 +311,14 @@ class TestCfgUnconditionalSeedPolicy(unittest.TestCase):
                 seed_values.isdisjoint(record["ids"].flatten().tolist())
             )
         self.assertEqual(records["cfg_shapes"], [(2, 2), (4, 4)])
+        generated = _expected_generated()
+        expected_anchors = [None, None, generated[:, 1], None]
+        for record, expected_anchor in zip(u_calls, expected_anchors):
+            actual_anchor = record["first_prev_ids"]
+            if expected_anchor is None:
+                self.assertIsNone(actual_anchor)
+            else:
+                self.assertTrue(torch.equal(actual_anchor, expected_anchor))
 
 
     def test_drop_ref_cache_matches_recompute_and_block_ids(self):

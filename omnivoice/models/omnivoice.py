@@ -59,6 +59,11 @@ from transformers import (
 from transformers.modeling_outputs import ModelOutput
 from transformers.models.auto import CONFIG_MAPPING, AutoConfig
 
+from omnivoice.blockdiff_dual import KIND_ACOUSTIC
+from omnivoice.models.block_markov import (
+    RevealedNeighborMarkovHead,
+    infer_adjacent_audio_prev_ids,
+)
 from omnivoice.utils.audio import (
     cross_fade_chunks,
     fade_and_pad_audio,
@@ -222,6 +227,8 @@ class OmniVoiceConfig(PretrainedConfig):
         audio_mask_id: int = 1024,
         num_audio_codebook: int = 8,
         audio_codebook_weights: Optional[list[float]] = None,
+        block_markov_rank: int = 0,
+        block_markov_seed: int = 42,
         llm_config: Optional[Union[dict, PretrainedConfig]] = None,
         **kwargs,
     ):
@@ -235,6 +242,12 @@ class OmniVoiceConfig(PretrainedConfig):
         self.audio_vocab_size = audio_vocab_size
         self.audio_mask_id = audio_mask_id
         self.num_audio_codebook = num_audio_codebook
+        if block_markov_rank < 0:
+            raise ValueError(
+                f"block_markov_rank must be non-negative, got {block_markov_rank}"
+            )
+        self.block_markov_rank = int(block_markov_rank)
+        self.block_markov_seed = int(block_markov_seed)
         if audio_codebook_weights is None:
             audio_codebook_weights = [8, 8, 6, 6, 4, 4, 2, 2]
         self.audio_codebook_weights = audio_codebook_weights
@@ -279,6 +292,9 @@ class OmniVoice(PreTrainedModel):
             config.num_audio_codebook * config.audio_vocab_size,
             bias=False,
         )
+        self.block_markov_head = self._new_block_markov_head(
+            config.block_markov_rank
+        )
 
         self.normalized_audio_codebook_weights = [
             w / sum(config.audio_codebook_weights)
@@ -286,6 +302,13 @@ class OmniVoice(PreTrainedModel):
         ]
 
         self.post_init()
+        if self.block_markov_head is not None:
+            # PreTrainedModel.post_init() reinitializes Linear modules.
+            # Re-establish a deterministic exact-baseline attachment contract
+            # without perturbing the caller's global RNG stream.
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(self.config.block_markov_seed)
+                self.block_markov_head.reset_parameters()
 
         # Inference-only attributes (set by from_pretrained when not in train mode)
         self.text_tokenizer = None
@@ -293,6 +316,130 @@ class OmniVoice(PreTrainedModel):
         self.duration_estimator = None
         self.sampling_rate = None
         self._asr_pipe = None
+
+    def _new_block_markov_head(
+        self, rank: int
+    ) -> Optional[RevealedNeighborMarkovHead]:
+        if rank == 0:
+            return None
+        return RevealedNeighborMarkovHead(
+            num_codebooks=self.config.num_audio_codebook,
+            vocab_size=self.config.audio_vocab_size,
+            mask_id=self.config.audio_mask_id,
+            rank=rank,
+        )
+
+    def enable_block_markov_head(
+        self, rank: int, *, seed: Optional[int] = None
+    ) -> None:
+        """Attach a zero-output Markov head after a strict legacy load."""
+        if rank <= 0:
+            raise ValueError(f"rank must be positive, got {rank}")
+        current_rank = int(getattr(self.config, "block_markov_rank", 0))
+        if self.block_markov_head is not None:
+            if current_rank != rank:
+                raise ValueError(
+                    "cannot change an existing block Markov rank: "
+                    f"checkpoint={current_rank}, requested={rank}"
+                )
+            return
+        if current_rank not in (0, rank):
+            raise ValueError(
+                "model config/head mismatch: "
+                f"config rank={current_rank}, requested={rank}"
+            )
+        if seed is None:
+            seed = int(getattr(self.config, "block_markov_seed", 42))
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(seed)
+            head = self._new_block_markov_head(rank)
+        assert head is not None
+        head.to(
+            device=self.audio_heads.weight.device,
+            dtype=self.audio_heads.weight.dtype,
+        )
+        self.block_markov_head = head
+        self.config.block_markov_rank = int(rank)
+        self.config.block_markov_seed = int(seed)
+
+    def _compute_audio_logits(
+        self,
+        hidden_states: torch.Tensor,
+        *,
+        input_ids: torch.Tensor,
+        audio_mask: torch.Tensor,
+        markov_prev_ids: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Project hidden states and apply the opt-in acoustic correction."""
+        audio_logits = self._project_audio_logits(hidden_states)
+        return self._apply_block_markov_head(
+            audio_logits,
+            input_ids=input_ids,
+            audio_mask=audio_mask,
+            markov_prev_ids=markov_prev_ids,
+        )
+
+    def _project_audio_logits(
+        self, hidden_states: torch.Tensor
+    ) -> torch.Tensor:
+        batch_size, seq_len, _ = hidden_states.shape
+        logits_flat = self.audio_heads(hidden_states)
+        return logits_flat.view(
+            batch_size,
+            seq_len,
+            self.config.num_audio_codebook,
+            self.config.audio_vocab_size,
+        ).permute(0, 2, 1, 3)
+
+    def _apply_block_markov_head(
+        self,
+        audio_logits: torch.Tensor,
+        *,
+        input_ids: torch.Tensor,
+        audio_mask: torch.Tensor,
+        markov_prev_ids: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        if self.block_markov_head is None:
+            return audio_logits
+        if markov_prev_ids is None:
+            markov_prev_ids = infer_adjacent_audio_prev_ids(
+                input_ids,
+                audio_mask,
+                mask_id=self.config.audio_mask_id,
+            )
+        return self.block_markov_head(
+            audio_logits,
+            markov_prev_ids,
+            audio_mask,
+        )
+
+    def _audio_logits_for_loss(
+        self,
+        base_audio_logits: torch.Tensor,
+        corrected_audio_logits: torch.Tensor,
+        labels: torch.Tensor,
+        loss_kind: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        """Train the Markov head only on content-acoustic supervision.
+
+        EOS and VOID rows are part of the stopping contract even when their
+        target ids happen to be ordinary codec tokens.  They therefore use
+        the untouched backbone logits exactly.  This also avoids bf16
+        log-partition round-off becoming a structural training signal.
+        """
+        if self.block_markov_head is None:
+            return corrected_audio_logits
+        if loss_kind is None:
+            raise ValueError(
+                "block Markov training requires loss_kind so EOS/VOID rows "
+                "cannot silently train the acoustic head"
+            )
+        acoustic_targets = loss_kind.eq(KIND_ACOUSTIC) & labels.ne(-100)
+        return torch.where(
+            acoustic_targets.unsqueeze(-1),
+            corrected_audio_logits,
+            base_audio_logits,
+        )
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -443,7 +590,19 @@ class OmniVoice(PreTrainedModel):
         copy_tags: Optional[torch.Tensor] = None,
         block_ids: Optional[torch.Tensor] = None,
         loss_kind: Optional[torch.Tensor] = None,
+        markov_prev_ids: Optional[torch.Tensor] = None,
     ):
+        if self.block_markov_head is not None and markov_prev_ids is None and (
+            labels is not None
+            or document_ids is not None
+            or copy_tags is not None
+            or block_ids is not None
+        ):
+            raise ValueError(
+                "block Markov training/packed forward requires explicit "
+                "markov_prev_ids; adjacent inference is only valid for a "
+                "single contiguous audio timeline"
+            )
 
         inputs_embeds = self._prepare_embed_inputs(input_ids, audio_mask)
 
@@ -550,24 +709,28 @@ class OmniVoice(PreTrainedModel):
 
         loss = None
 
-        # Shape: [B, S, C * Vocab]
-        batch_size, seq_len, _ = hidden_states.shape
-        logits_flat = self.audio_heads(hidden_states)
         # Shape: [B, S, C, Vocab] -> [B, C, S, Vocab]
-        audio_logits = logits_flat.view(
-            batch_size,
-            seq_len,
-            self.config.num_audio_codebook,
-            self.config.audio_vocab_size,
-        ).permute(0, 2, 1, 3)
+        base_audio_logits = self._project_audio_logits(hidden_states)
+        audio_logits = self._apply_block_markov_head(
+            base_audio_logits,
+            input_ids=input_ids,
+            audio_mask=audio_mask,
+            markov_prev_ids=markov_prev_ids,
+        )
 
         if labels is not None:
 
             # audio_logits.permute(0, 3, 1, 2):
             # [Batch, Layer, Seq, Vocab] -> [Batch, Vocab, Layer, Seq]
             # per_token_loss shape: [Batch, Layer, Seq]，ignore -100
+            loss_audio_logits = self._audio_logits_for_loss(
+                base_audio_logits,
+                audio_logits,
+                labels,
+                loss_kind,
+            )
             per_token_loss = torch.nn.functional.cross_entropy(
-                audio_logits.permute(0, 3, 1, 2),
+                loss_audio_logits.permute(0, 3, 1, 2),
                 labels,
                 reduction="none",
                 ignore_index=-100,

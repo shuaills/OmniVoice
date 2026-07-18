@@ -33,6 +33,7 @@ Key functions:
 """
 
 import copy
+import hashlib
 import json
 import logging
 import math
@@ -327,6 +328,20 @@ def build_model_and_tokenizer(
 ) -> Tuple[OmniVoice, AutoTokenizer]:
     """Load Tokenizer and Model, handle resizing and special tokens."""
     logger.info("Initializing Model & Tokenizer...")
+    if config.block_markov_rank < 0:
+        raise ValueError("block_markov_rank must be non-negative")
+    if config.block_markov_rank > 0 and not (
+        config.block_training and config.block_scheme == "dual"
+    ):
+        raise ValueError(
+            "block_markov_rank > 0 requires block_training with "
+            "block_scheme='dual'"
+        )
+    if config.block_markov_rank > 0 and not config.split_loss:
+        raise ValueError(
+            "block_markov_rank > 0 requires split_loss so content, EOS, and "
+            "VOID supervision remain explicitly separated"
+        )
 
     # 1. Tokenizer
     tokenizer_path = (
@@ -381,6 +396,38 @@ def build_model_and_tokenizer(
         # A checkpoint load must preserve every trained embedding/head row.
         # Only the copied config above may be corrected; never resize here.
         assert_model_text_vocab_contract(model, tokenizer)
+        loaded_markov_rank = int(
+            getattr(model.config, "block_markov_rank", 0)
+        )
+        if loaded_markov_rank == 0 and config.block_markov_rank > 0:
+            # Legacy checkpoints must first load strictly with their original
+            # parameter set.  The zero-output experimental head is attached
+            # only after that proof succeeds.
+            model.enable_block_markov_head(
+                config.block_markov_rank,
+                seed=config.seed,
+            )
+            embedding_hash = hashlib.sha256(
+                model.block_markov_head.prev_embeddings.weight.detach()
+                .cpu()
+                .contiguous()
+                .numpy()
+                .tobytes()
+            ).hexdigest()[:16]
+            logger.info(
+                "Attached zero-output block Markov head "
+                "(rank=%d, params=%d, seed=%d, embedding_sha256=%s)",
+                config.block_markov_rank,
+                model.block_markov_head.parameter_count,
+                config.seed,
+                embedding_hash,
+            )
+        elif loaded_markov_rank != config.block_markov_rank:
+            raise ValueError(
+                "block_markov_rank does not match checkpoint: "
+                f"checkpoint={loaded_markov_rank}, "
+                f"requested={config.block_markov_rank}"
+            )
     else:
         resolved_llm = _resolve_model_path(config.llm_name_or_path)
         llm_config = AutoConfig.from_pretrained(resolved_llm)
@@ -390,6 +437,8 @@ def build_model_and_tokenizer(
             audio_mask_id=config.audio_mask_id,
             num_audio_codebook=config.num_audio_codebook,
             audio_codebook_weights=config.audio_codebook_weights,
+            block_markov_rank=config.block_markov_rank,
+            block_markov_seed=config.seed,
             llm_config=llm_config,
         )
 
@@ -615,6 +664,7 @@ def build_dataloaders(
             processor = OmniVoiceBlockDualSampleProcessor(
                 **processor_kwargs,
                 block_size=config.block_size,
+                block_markov_prev_ids=config.block_markov_rank > 0,
                 turn_boundary_prompt_prob=getattr(
                     config, "turn_boundary_prompt_prob", 0.0
                 ),

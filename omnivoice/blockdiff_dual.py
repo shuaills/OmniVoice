@@ -134,6 +134,47 @@ def build_loss_kind(
     return kind
 
 
+def build_block_markov_prev_ids(
+    noisy_copy: torch.Tensor,
+    clean_copy: torch.Tensor,
+    noisy_block_ids: torch.Tensor,
+    *,
+    mask_id: int,
+) -> torch.Tensor:
+    """Build inference-shaped previous-frame inputs without target leakage.
+
+    Inside a noisy block the head sees the actually corrupted previous frame,
+    so a masked neighbour remains unknown.  At a block boundary it sees the
+    last frame of the preceding committed clean block, matching block-causal
+    decode.  The first target-only block has no synthetic predecessor.
+    """
+    if noisy_copy.ndim != 2 or clean_copy.ndim != 2:
+        raise ValueError("clean/noisy copies must have shape [C, T]")
+    if noisy_copy.size(0) != clean_copy.size(0):
+        raise ValueError("clean/noisy copies must have the same codebook count")
+    if tuple(noisy_block_ids.shape) != (noisy_copy.size(1),):
+        raise ValueError(
+            "noisy_block_ids must have one id per noisy frame, got "
+            f"{tuple(noisy_block_ids.shape)} for {tuple(noisy_copy.shape)}"
+        )
+
+    prev = torch.full_like(noisy_copy, int(mask_id))
+    if noisy_copy.size(1) <= 1:
+        return prev
+
+    same_block = noisy_block_ids[1:].eq(noisy_block_ids[:-1])
+    committed_anchor = torch.full_like(noisy_copy[:, :-1], int(mask_id))
+    anchor_len = min(clean_copy.size(1), committed_anchor.size(1))
+    if anchor_len > 0:
+        committed_anchor[:, :anchor_len] = clean_copy[:, :anchor_len]
+    prev[:, 1:] = torch.where(
+        same_block.unsqueeze(0),
+        noisy_copy[:, :-1],
+        committed_anchor,
+    )
+    return prev
+
+
 SILENCE_FRAME_TOKENS = torch.tensor(
     [244, 354, 998, 351, 433, 552, 926, 419], dtype=torch.long
 )
@@ -161,11 +202,13 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                  cfg_drop_ref_q_min: int = 1,
                  cfg_drop_ref_q_max: int = 32,
                  cfg_drop_ref_short_q_max: int = 4,
+                 block_markov_prev_ids: bool = False,
                  **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
             raise ValueError(f"block_size must be positive, got {block_size}")
         self.block_size = block_size
+        self.block_markov_prev_ids = bool(block_markov_prev_ids)
         # With this probability (and when the label carries per-sentence
         # 'turns' timestamps), snap the prompt cut to a sentence END instead of
         # a uniform mid-flow frame. Rationale: inference voice-cloning presents
@@ -575,6 +618,24 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
             "block_idx": block_idx,
             "loss_kind": loss_kind,
         }
+        if self.block_markov_prev_ids:
+            noisy_prev_ids = build_block_markov_prev_ids(
+                noisy_copy,
+                clean_copy,
+                noisy_block_idx,
+                mask_id=self.audio_mask_id,
+            )
+            output["markov_prev_ids"] = torch.cat(
+                [
+                    torch.full(
+                        (C, P + clean_len),
+                        self.audio_mask_id,
+                        dtype=torch.long,
+                    ),
+                    noisy_prev_ids,
+                ],
+                dim=1,
+            )
         if self.cfg_branch_training:
             output.update(
                 {
@@ -619,7 +680,14 @@ def _crop_cache(cache, length: int) -> None:
         cache.value_cache[i] = cache.value_cache[i][..., :length, :]
 
 
-def _forward_slices(model, ids, positions, attn4d, past_key_values=None):
+def _forward_slices(
+    model,
+    ids,
+    positions,
+    attn4d,
+    past_key_values=None,
+    first_prev_ids=None,
+):
     """Run backbone + audio heads on explicit tensors.
 
     ids [C, L] (audio cells; mask id where unknown), positions [L],
@@ -636,13 +704,27 @@ def _forward_slices(model, ids, positions, attn4d, past_key_values=None):
         return_dict=True,
     )
     h = out[0]
-    B, L, _ = h.shape
-    logits = (
-        model.audio_heads(h)
-        .view(B, L, model.config.num_audio_codebook, model.config.audio_vocab_size)
-        .permute(0, 2, 1, 3)
+    markov_prev_ids = None
+    if model.block_markov_head is not None and first_prev_ids is not None:
+        if tuple(first_prev_ids.shape) != (model.config.num_audio_codebook,):
+            raise ValueError(
+                "first_prev_ids must have one id per codebook, got "
+                f"{tuple(first_prev_ids.shape)}"
+            )
+        from omnivoice.models.block_markov import infer_adjacent_audio_prev_ids
+
+        markov_prev_ids = infer_adjacent_audio_prev_ids(
+            ids.unsqueeze(0),
+            amask,
+            mask_id=model.config.audio_mask_id,
+            first_prev_ids=first_prev_ids.unsqueeze(0),
+        )
+    return model._compute_audio_logits(
+        h,
+        input_ids=ids.unsqueeze(0),
+        audio_mask=amask,
+        markov_prev_ids=markov_prev_ids,
     )
-    return logits
 
 
 def _forward_text_prefix(model, text_ids, positions, attn4d, past_key_values):
@@ -933,7 +1015,14 @@ def _decode_block_causal(
                 Kc = caches["c"].get_seq_length()
                 attn = torch.ones((1, 1, bs, Kc + bs), dtype=torch.bool, device=device)
                 c_logits = _forward_slices(
-                    model, cur, cur_pos, attn, caches["c"]
+                    model,
+                    cur,
+                    cur_pos,
+                    attn,
+                    caches["c"],
+                    first_prev_ids=(
+                        committed[:, -1] if committed.size(1) > 0 else None
+                    ),
                 )
                 _crop_cache(caches["c"], Kc)
                 if use_cfg:
@@ -955,7 +1044,16 @@ def _decode_block_causal(
                             u_len, device=device
                         )
                         u_logits = _forward_slices(
-                            model, u_cur, u_pos, attn_u, caches["u"]
+                            model,
+                            u_cur,
+                            u_pos,
+                            attn_u,
+                            caches["u"],
+                            first_prev_ids=(
+                                u_committed[:, -1]
+                                if u_committed.size(1) > 0
+                                else None
+                            ),
                         )
                     else:
                         attn_u = torch.ones(
@@ -965,7 +1063,16 @@ def _decode_block_causal(
                         )
                         u_pos = b * bs + torch.arange(bs, device=device)
                         u_logits = _forward_slices(
-                            model, cur, u_pos, attn_u, caches["u"]
+                            model,
+                            cur,
+                            u_pos,
+                            attn_u,
+                            caches["u"],
+                            first_prev_ids=(
+                                committed[:, -1]
+                                if committed.size(1) > 0
+                                else None
+                            ),
                         )
                     _crop_cache(caches["u"], Ku)
                 else:
@@ -1471,11 +1578,10 @@ def _forward_slices_mixed(model, ids, P, positions, attn4d):
         return_dict=True,
     )
     h = out[0]
-    B, L, _ = h.shape
-    return (
-        model.audio_heads(h)
-        .view(B, L, model.config.num_audio_codebook, model.config.audio_vocab_size)
-        .permute(0, 2, 1, 3)
+    return model._compute_audio_logits(
+        h,
+        input_ids=ids.unsqueeze(0),
+        audio_mask=amask,
     )
 
 
