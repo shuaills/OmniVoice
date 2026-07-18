@@ -1,18 +1,33 @@
 #!/usr/bin/env bash
-# Self-terminating two-node (2 x 8 H100) smoke launcher for shared10 CFG + Band-4.
+# Self-terminating two-node (2 x 8 H100) launcher for shared10 CFG + Band-4.
 set -euo pipefail
 
 usage() {
-  echo "usage: cfg90100_band4_pretrain_16g.sh smoke300" >&2
+  echo "usage: cfg90100_band4_pretrain_16g.sh smoke300|perf300" >&2
 }
 
-if [[ $# -ne 1 || $1 != smoke300 ]]; then
+if [[ $# -ne 1 ]]; then
   usage
   exit 2
 fi
 
 mode=$1
-config=examples/config/train_config_cfg90100_band4_smoke300_16g.json
+case "$mode" in
+  smoke300)
+    config=examples/config/train_config_cfg90100_band4_smoke300_16g.json
+    expected_grad_checkpoint=true
+    expected_balanced_packing=0
+    ;;
+  perf300)
+    config=examples/config/train_config_cfg90100_band4_perf300_16g.json
+    expected_grad_checkpoint=false
+    expected_balanced_packing=0
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
 expected_num_machines=2
 expected_gpus_per_machine=8
 expected_world_size=16
@@ -89,9 +104,15 @@ export PYTHONPATH="$root:/opt/gpfs/users/shuai/work/block-b2-perf/pylibs"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-8}
 export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
-export NCCL_DEBUG=${NCCL_DEBUG:-INFO}
+export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
+nccl_debug=${NCCL_DEBUG:-INFO}
+if [[ $nccl_debug != INFO || $NCCL_IB_DISABLE != 0 ]]; then
+  echo "refusing unverifiable NCCL contract: NCCL_DEBUG=$nccl_debug NCCL_IB_DISABLE=$NCCL_IB_DISABLE" >&2
+  exit 1
+fi
+export NCCL_DEBUG=$nccl_debug
 
-python - "$config" "$world_size" "$reference_world_size" "$reference_batch_tokens" "$reference_gradient_accumulation_steps" <<'PY'
+python - "$config" "$world_size" "$reference_world_size" "$reference_batch_tokens" "$reference_gradient_accumulation_steps" "$expected_grad_checkpoint" "$expected_balanced_packing" <<'PY'
 import json
 import math
 import sys
@@ -104,11 +125,15 @@ from omnivoice.training.config import TrainingConfig
     reference_world_size_raw,
     reference_batch_tokens_raw,
     reference_ga_raw,
+    expected_grad_checkpoint_raw,
+    expected_balanced_packing_raw,
 ) = sys.argv[1:]
 world_size = int(world_size_raw)
 reference_world_size = int(reference_world_size_raw)
 reference_batch_tokens = int(reference_batch_tokens_raw)
 reference_ga = int(reference_ga_raw)
+expected_grad_checkpoint = expected_grad_checkpoint_raw == "true"
+expected_balanced_packing = int(expected_balanced_packing_raw)
 
 with open(config_path) as stream:
     config = json.load(stream)
@@ -143,6 +168,8 @@ expected = {
     "warmup_type": "steps",
     "warmup_ratio": 0.0,
     "warmup_steps": 9000,
+    "perf_grad_checkpoint": expected_grad_checkpoint,
+    "perf_balanced_packing": expected_balanced_packing,
 }
 for key, value in expected.items():
     actual = config.get(key)
@@ -242,6 +269,14 @@ wait_for_file() {
 config_sha256=$(sha256sum "$config" | awk '{print $1}')
 data_config=examples/config/data_config_emilia_full_blockparity.json
 data_config_sha256=$(sha256sum "$data_config" | awk '{print $1}')
+baseline_log=${BASELINE_LOG:-/opt/gpfs/users/shuai/experiments/cfg90100-band4-pretrain16g-20260718/logs/smoke300_shuai-cfg90100-band4-smoke300-h16-rdma-v2.node0.log}
+baseline_log_sha256=not-applicable
+if [[ $mode == perf300 ]]; then
+  if [[ ! -s $baseline_log ]]; then
+    die "missing frozen 16-GPU RDMA baseline log: $baseline_log"
+  fi
+  baseline_log_sha256=$(sha256sum "$baseline_log" | awk '{print $1}')
+fi
 main_process_port=${MASTER_PORT:-29517}
 if [[ ! $main_process_port =~ ^[0-9]+$ || $main_process_port -lt 1024 || $main_process_port -gt 65535 ]]; then
   die "invalid MASTER_PORT=$main_process_port"
@@ -249,9 +284,21 @@ fi
 
 if [[ $node_rank -eq 0 ]]; then
   for artifact in "$output" "$manifest" "$pass_file" \
-    "$log_dir/${mode}_${run_id}.node0.log" "$log_dir/${mode}_${run_id}.node1.log" "$control_dir"; do
+    "$log_dir/${mode}_${run_id}.node0.log" "$log_dir/${mode}_${run_id}.node1.log" \
+    "$output_root/${mode}_${run_id}.SUMMARY.log" \
+    "$output_root/${mode}_${run_id}.SUMMARY.json" \
+    "$output_root/${mode}_${run_id}.SUMMARY.tsv" \
+    "$output_root/${mode}_${run_id}.VERDICT.txt" \
+    "$control_dir"; do
     if [[ -e $artifact ]]; then
       echo "refusing to reuse artifact: $artifact" >&2
+      exit 1
+    fi
+  done
+  for rank in 0 1; do
+    gpu_artifact="$log_dir/${mode}_${run_id}.node${rank}.gpu.csv"
+    if [[ -e $gpu_artifact ]]; then
+      echo "refusing to reuse artifact: $gpu_artifact" >&2
       exit 1
     fi
   done
@@ -266,6 +313,7 @@ if [[ $node_rank -eq 0 ]]; then
     echo "created_epoch=$created_epoch"
     echo "source_commit=$source_commit"
     echo "config_sha256=$config_sha256"
+    echo "baseline_log_sha256=$baseline_log_sha256"
     echo "num_machines=$num_machines"
     echo "gpus_per_machine=$gpus_per_machine"
     echo "world_size=$world_size"
@@ -284,6 +332,8 @@ if [[ $node_rank -eq 0 ]]; then
     echo "config_sha256=$config_sha256"
     echo "data_config=$data_config"
     echo "data_config_sha256=$data_config_sha256"
+    echo "baseline_log=$baseline_log"
+    echo "baseline_log_sha256=$baseline_log_sha256"
     echo "llm_name_or_path=/opt/gpfs/models/Qwen3-0.6B"
     echo "num_machines=$num_machines"
     echo "gpus_per_machine=$gpus_per_machine"
@@ -292,6 +342,8 @@ if [[ $node_rank -eq 0 ]]; then
     echo "batch_tokens_per_gpu=7824"
     echo "gradient_accumulation_steps=1"
     echo "global_batch_tokens=125184"
+    echo "perf_grad_checkpoint=$expected_grad_checkpoint"
+    echo "perf_balanced_packing=$expected_balanced_packing"
     echo "main_process_ip=$master_ip"
     echo "main_process_port=$main_process_port"
     echo "nccl_socket_ifname=$NCCL_SOCKET_IFNAME"
@@ -304,9 +356,10 @@ else
   meta_run_id=$(awk -F= '$1 == "run_id" {print $2}' "$meta_file")
   meta_source_commit=$(awk -F= '$1 == "source_commit" {print $2}' "$meta_file")
   meta_config_sha256=$(awk -F= '$1 == "config_sha256" {print $2}' "$meta_file")
+  meta_baseline_log_sha256=$(awk -F= '$1 == "baseline_log_sha256" {print $2}' "$meta_file")
   now_epoch=$(date +%s)
   age_seconds=$((now_epoch - created_epoch))
-  if [[ $meta_run_id != "$run_id" || $meta_source_commit != "$source_commit" || $meta_config_sha256 != "$config_sha256" ]]; then
+  if [[ $meta_run_id != "$run_id" || $meta_source_commit != "$source_commit" || $meta_config_sha256 != "$config_sha256" || $meta_baseline_log_sha256 != "$baseline_log_sha256" ]]; then
     die "rank-0 metadata mismatch"
   fi
   if [[ $age_seconds -lt 0 || $age_seconds -gt 600 ]]; then
@@ -333,6 +386,38 @@ wait_for_file "$control_dir/preflight.node0.ok" "node-0 preflight"
 wait_for_file "$control_dir/preflight.node1.ok" "node-1 preflight"
 
 gpu_ids=$(seq -s, 0 $((gpus_per_machine - 1)))
+gpu_csv="$log_dir/${mode}_${run_id}.node${node_rank}.gpu.csv"
+monitor_pid=""
+cleanup_monitor() {
+  if [[ -n ${monitor_pid:-} ]]; then
+    kill "$monitor_pid" 2>/dev/null || true
+    wait "$monitor_pid" 2>/dev/null || true
+    monitor_pid=""
+  fi
+}
+on_signal() {
+  trap - EXIT INT TERM
+  cleanup_monitor
+  running_jobs=$(jobs -pr)
+  if [[ -n $running_jobs ]]; then
+    kill $running_jobs 2>/dev/null || true
+  fi
+  exit 143
+}
+trap cleanup_monitor EXIT
+trap on_signal INT TERM
+(
+  echo "timestamp_utc,index,memory_used_mib,utilization_gpu_percent"
+  while true; do
+    timestamp=$(date -u +%FT%TZ)
+    nvidia-smi \
+      --query-gpu=index,memory.used,utilization.gpu \
+      --format=csv,noheader,nounits \
+      | awk -F, -v timestamp="$timestamp" '{gsub(/ /, "", $0); print timestamp "," $0}'
+    sleep 1
+  done
+) > "$gpu_csv" &
+monitor_pid=$!
 echo "CFG90100_16G_START mode=$mode run_id=$run_id host=$host node_rank=$node_rank local_ranks=0-7 global_ranks=$((node_rank * 8))-$((node_rank * 8 + 7)) world_size=$world_size output=$output time=$(date -u +%FT%TZ)"
 set +e
 accelerate launch \
@@ -357,6 +442,29 @@ if [[ $node_rc -eq 0 && $tee_rc -ne 0 ]]; then
   node_rc=$tee_rc
 fi
 set -e
+cleanup_monitor
+
+if ! grep -F "PERF: gradient checkpointing active=$( [[ $expected_grad_checkpoint == true ]] && echo True || echo False )" "$log_path" >/dev/null; then
+  echo "missing runtime gradient-checkpointing assertion in $log_path" >&2
+  node_rc=1
+fi
+if ! grep -F "PERF: balanced packing window=$expected_balanced_packing" "$log_path" >/dev/null; then
+  echo "missing runtime balanced-packing assertion in $log_path" >&2
+  node_rc=1
+fi
+if ! grep -F "Using network IB" "$log_path" >/dev/null; then
+  echo "missing positive NCCL IB selection proof in $log_path; refusing socket fallback" >&2
+  node_rc=1
+fi
+gdrdma_ids=$( { grep -oE 'NET/IB/[0-7]/GDRDMA' "$log_path" || true; } | sort -u | wc -l)
+if [[ $gdrdma_ids -ne 8 ]]; then
+  echo "incomplete NCCL GDRDMA proof in $log_path: expected=8 actual=$gdrdma_ids" >&2
+  node_rc=1
+fi
+if grep -Ei 'nan|(^|[^[:alpha:]])inf([^[:alpha:]]|$)|OutOfMemory|OOMKilled|Traceback|ChildFailedError|ProcessExitedException|NCCL[^[:alnum:]]+(error|failed)' "$log_path" >/dev/null; then
+  echo "failure or non-finite signature found in $log_path" >&2
+  node_rc=1
+fi
 
 {
   echo "node_rank=$node_rank"
@@ -378,6 +486,30 @@ peer_rc=$(awk -F= '$1 == "rc" {print $2}' "$control_dir/node1.rc")
 rc=$node_rc
 if [[ $rc -eq 0 && $peer_rc -ne 0 ]]; then
   rc=$peer_rc
+fi
+
+max_memory_mib=0
+for rank in 0 1; do
+  rank_gpu_csv="$log_dir/${mode}_${run_id}.node${rank}.gpu.csv"
+  if [[ ! -s $rank_gpu_csv ]]; then
+    echo "missing GPU telemetry: $rank_gpu_csv" | tee -a "$log_path" >&2
+    rc=1
+    continue
+  fi
+  rank_rows=$(awk -F, 'NR > 1 && $2 ~ /^[0-9]+$/ {count++} END {print count + 0}' "$rank_gpu_csv")
+  rank_gpu_ids=$(awk -F, 'NR > 1 && $2 ~ /^[0-9]+$/ {seen[$2]=1} END {for (id in seen) count++; print count + 0}' "$rank_gpu_csv")
+  if ((rank_rows < 8 || rank_gpu_ids != 8)); then
+    echo "invalid GPU telemetry: rank=$rank rows=$rank_rows gpu_ids=$rank_gpu_ids path=$rank_gpu_csv" | tee -a "$log_path" >&2
+    rc=1
+  fi
+  rank_max_memory=$(awk -F, 'NR > 1 {if ($3 + 0 > max) max=$3 + 0} END {print max + 0}' "$rank_gpu_csv")
+  if ((rank_max_memory > max_memory_mib)); then
+    max_memory_mib=$rank_max_memory
+  fi
+done
+if ((max_memory_mib >= 70 * 1024)); then
+  echo "peak-memory gate failed: max_memory_mib=$max_memory_mib" | tee -a "$log_path" >&2
+  rc=1
 fi
 
 checkpoint="$output/checkpoint-$expected_final_step"
@@ -438,10 +570,41 @@ PY
   fi
 fi
 
+summary_verdict=not-applicable
+summary_path=not-applicable
+if [[ $rc -eq 0 && $mode == perf300 ]]; then
+  summary_prefix="$output_root/${mode}_${run_id}"
+  summary_log="$summary_prefix.SUMMARY.log"
+  set +e
+  python scripts/summarize_cfg90100_perf16.py \
+    --baseline-log "$baseline_log" \
+    --candidate-log "$log_dir/${mode}_${run_id}.node0.log" \
+    --gpu-csv "$log_dir/${mode}_${run_id}.node0.gpu.csv" \
+    --gpu-csv "$log_dir/${mode}_${run_id}.node1.gpu.csv" \
+    --output-prefix "$summary_prefix" \
+    2>&1 | tee "$summary_log"
+  summary_pipeline=("${PIPESTATUS[@]}")
+  set -e
+  if [[ ${summary_pipeline[0]} -ne 0 || ${summary_pipeline[1]} -ne 0 ]]; then
+    echo "16-GPU performance summary failed: python_rc=${summary_pipeline[0]} tee_rc=${summary_pipeline[1]}" | tee -a "$log_path" >&2
+    rc=1
+  else
+    summary_path="$summary_prefix.SUMMARY.json"
+    summary_verdict=$(awk -F= '$1 == "VERDICT" {print $2}' "$summary_prefix.VERDICT.txt")
+    if [[ $summary_verdict != PASS ]]; then
+      echo "16-GPU performance gate failed: verdict=$summary_verdict" | tee -a "$log_path" >&2
+      rc=1
+    fi
+  fi
+fi
+
 {
   echo "finished_utc=$(date -u +%FT%TZ)"
   echo "node0_rc=$node_rc"
   echo "node1_rc=$peer_rc"
+  echo "max_memory_mib=$max_memory_mib"
+  echo "summary_verdict=$summary_verdict"
+  echo "summary_path=$summary_path"
   echo "rc=$rc"
 } >> "$manifest"
 
@@ -451,6 +614,11 @@ if [[ $rc -eq 0 ]]; then
     echo "source_commit=$source_commit"
     echo "world_size=$world_size"
     echo "global_batch_tokens=125184"
+    echo "perf_grad_checkpoint=$expected_grad_checkpoint"
+    echo "perf_balanced_packing=$expected_balanced_packing"
+    echo "max_memory_mib=$max_memory_mib"
+    echo "summary_verdict=$summary_verdict"
+    echo "summary_path=$summary_path"
     echo "checkpoint=$checkpoint"
     echo "manifest=$manifest"
     echo "completed_utc=$(date -u +%FT%TZ)"

@@ -9,13 +9,16 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 REFERENCE_CONFIG = ROOT / "examples/config/train_config_cfg90100_band4_300k.json"
 SMOKE_CONFIG = ROOT / "examples/config/train_config_cfg90100_band4_smoke300_16g.json"
+PERF_CONFIG = ROOT / "examples/config/train_config_cfg90100_band4_perf300_16g.json"
 LAUNCHER = ROOT / "cfg90100_band4_pretrain_16g.sh"
+SUMMARIZER = ROOT / "scripts/summarize_cfg90100_perf16.py"
 
 
 class ReceiptContractTest(unittest.TestCase):
     def setUp(self):
         self.reference = json.loads(REFERENCE_CONFIG.read_text())
         self.smoke = json.loads(SMOKE_CONFIG.read_text())
+        self.perf = json.loads(PERF_CONFIG.read_text())
         self.launcher = LAUNCHER.read_text()
 
     def test_model_contract_matches_current_8g_pretrain(self):
@@ -30,6 +33,7 @@ class ReceiptContractTest(unittest.TestCase):
             "save_steps",
             "keep_last_n_checkpoints",
             "output_dir",
+            "perf_balanced_packing",
         }
         for key in sorted(set(self.reference) | set(self.smoke)):
             if key not in allowed_changes:
@@ -49,6 +53,18 @@ class ReceiptContractTest(unittest.TestCase):
         self.assertEqual(reference_global_batch, 125184)
         self.assertEqual(smoke_global_batch, reference_global_batch)
 
+    def test_perf_arm_is_only_gradient_checkpointing_off(self):
+        allowed_changes = {
+            "output_dir",
+            "perf_grad_checkpoint",
+        }
+        for key in sorted(set(self.smoke) | set(self.perf)):
+            if key not in allowed_changes:
+                self.assertEqual(self.perf.get(key), self.smoke.get(key), key)
+        self.assertTrue(self.smoke["perf_grad_checkpoint"])
+        self.assertFalse(self.perf["perf_grad_checkpoint"])
+        self.assertEqual(self.perf["perf_balanced_packing"], 0)
+
     def test_smoke_and_distributed_contract(self):
         self.assertEqual(self.smoke["steps"], 300)
         self.assertEqual(self.smoke["save_steps"], 300)
@@ -66,6 +82,11 @@ class ReceiptContractTest(unittest.TestCase):
         self.assertIn("VC_WORKER_HOSTS count mismatch", self.launcher)
         self.assertIn("--rdzv_backend static", self.launcher)
         self.assertIn("--max_restarts 0", self.launcher)
+        self.assertIn("smoke300|perf300", self.launcher)
+        self.assertIn("refusing socket fallback", self.launcher)
+        self.assertIn("Using network IB", self.launcher)
+        self.assertIn("NET/IB/[0-7]/GDRDMA", self.launcher)
+        self.assertIn(str(SUMMARIZER.relative_to(ROOT)), self.launcher)
         self.assertNotIn("sleep infinity", self.launcher)
 
 

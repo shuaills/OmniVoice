@@ -430,6 +430,20 @@ def build_model_and_tokenizer(
         )
         logger.info("PERF: gradient checkpointing enabled (use_reentrant=False)")
 
+    gradient_checkpointing_active = bool(
+        getattr(model.llm, "is_gradient_checkpointing", False)
+    )
+    if gradient_checkpointing_active != config.perf_grad_checkpoint:
+        raise RuntimeError(
+            "gradient-checkpointing runtime/config mismatch: "
+            f"configured={config.perf_grad_checkpoint} "
+            f"active={gradient_checkpointing_active}"
+        )
+    logger.info(
+        "PERF: gradient checkpointing active=%s",
+        gradient_checkpointing_active,
+    )
+
     if config.perf_flex_bf16_qkv:
         # ROOT-CAUSE FIX (16x anomaly): under accelerate bf16 mixed precision
         # with fp32 master weights, transformers-5.3 Qwen3 feeds flex
@@ -688,10 +702,13 @@ def build_dataloaders(
     use_packing = config.attn_implementation == "flex_attention"
 
     if use_packing:
+        balanced_window = getattr(config, "perf_balanced_packing", 0)
+        logger.info("PERF: balanced packing window=%s", balanced_window)
         train_dataset = PackingIterableDataset(
-            raw_train_ds, processor, config.batch_tokens
-        ,
-            balanced_window=getattr(config, 'perf_balanced_packing', 0),
+            raw_train_ds,
+            processor,
+            config.batch_tokens,
+            balanced_window=balanced_window,
         )
         collate_fn = PackingDataCollator(processor, config.batch_tokens)
     else:
