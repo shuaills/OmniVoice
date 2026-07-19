@@ -175,6 +175,62 @@ def build_block_markov_prev_ids(
     return prev
 
 
+def build_block_anchor_layout(
+    clean_copy: torch.Tensor,
+    block_bounds: list[int],
+    *,
+    prefix_len: int,
+    block_size: int,
+    mask_id: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Describe noisy blocks without exposing their clean current targets.
+
+    ``anchor_positions`` indexes only the corrupted noisy copy.  The optional
+    boundary token for block ``b`` is frame ``start(b)-1`` from the committed
+    clean prefix, which is exactly the state available before decoding that
+    block.  The first target-only block therefore starts from an unknown
+    boundary.  Rows are padded with ``-1`` to a fixed ``block_size`` so the
+    packed collator can concatenate layouts without reconstructing boundaries.
+    """
+    if clean_copy.ndim != 2:
+        raise ValueError(
+            f"clean_copy must have shape [C, T], got {tuple(clean_copy.shape)}"
+        )
+    if block_size <= 0:
+        raise ValueError(f"block_size must be positive, got {block_size}")
+    if len(block_bounds) < 2 or block_bounds[0] != 0:
+        raise ValueError("block_bounds must start at zero and contain one block")
+    if any(right <= left for left, right in zip(block_bounds, block_bounds[1:])):
+        raise ValueError(f"block_bounds must be strictly increasing: {block_bounds}")
+
+    num_blocks = len(block_bounds) - 1
+    num_codebooks = clean_copy.size(0)
+    noisy_start = int(prefix_len) + clean_copy.size(1)
+    anchor_positions = torch.full(
+        (num_blocks, block_size), -1, dtype=torch.long
+    )
+    anchor_boundary_ids = torch.full(
+        (num_blocks, num_codebooks), int(mask_id), dtype=torch.long
+    )
+
+    for block, (left, right) in enumerate(
+        zip(block_bounds, block_bounds[1:])
+    ):
+        width = right - left
+        if width > block_size:
+            raise ValueError(
+                f"block {block} width {width} exceeds block_size={block_size}"
+            )
+        anchor_positions[block, :width] = noisy_start + torch.arange(
+            left, right, dtype=torch.long
+        )
+        boundary = left - 1
+        if 0 <= boundary < clean_copy.size(1):
+            anchor_boundary_ids[block] = clean_copy[:, boundary]
+
+    return anchor_positions, anchor_boundary_ids
+
+
 SILENCE_FRAME_TOKENS = torch.tensor(
     [244, 354, 998, 351, 433, 552, 926, 419], dtype=torch.long
 )
@@ -203,12 +259,18 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                  cfg_drop_ref_q_max: int = 32,
                  cfg_drop_ref_short_q_max: int = 4,
                  block_markov_prev_ids: bool = False,
+                 block_anchor_layout: bool = False,
                  **kwargs):
         super().__init__(*args, **kwargs)
         if block_size <= 0:
             raise ValueError(f"block_size must be positive, got {block_size}")
         self.block_size = block_size
         self.block_markov_prev_ids = bool(block_markov_prev_ids)
+        self.block_anchor_layout = bool(block_anchor_layout)
+        if self.block_markov_prev_ids and self.block_anchor_layout:
+            raise ValueError(
+                "block Markov and block anchor side inputs are mutually exclusive"
+            )
         # With this probability (and when the label carries per-sentence
         # 'turns' timestamps), snap the prompt cut to a sentence END instead of
         # a uniform mid-flow frame. Rationale: inference voice-cloning presents
@@ -636,6 +698,17 @@ class OmniVoiceBlockDualSampleProcessor(OmniVoiceSampleProcessor):
                 ],
                 dim=1,
             )
+        if self.block_anchor_layout:
+            (
+                output["anchor_positions"],
+                output["anchor_boundary_ids"],
+            ) = build_block_anchor_layout(
+                clean_copy,
+                block_bounds,
+                prefix_len=P,
+                block_size=self.block_size,
+                mask_id=self.audio_mask_id,
+            )
         if self.cfg_branch_training:
             output.update(
                 {
@@ -687,6 +760,7 @@ def _forward_slices(
     attn4d,
     past_key_values=None,
     first_prev_ids=None,
+    anchor_start=None,
 ):
     """Run backbone + audio heads on explicit tensors.
 
@@ -705,12 +779,13 @@ def _forward_slices(
     )
     h = out[0]
     markov_prev_ids = None
-    if model.block_markov_head is not None and first_prev_ids is not None:
+    if first_prev_ids is not None:
         if tuple(first_prev_ids.shape) != (model.config.num_audio_codebook,):
             raise ValueError(
                 "first_prev_ids must have one id per codebook, got "
                 f"{tuple(first_prev_ids.shape)}"
             )
+    if model.block_markov_head is not None and first_prev_ids is not None:
         from omnivoice.models.block_markov import infer_adjacent_audio_prev_ids
 
         markov_prev_ids = infer_adjacent_audio_prev_ids(
@@ -719,11 +794,43 @@ def _forward_slices(
             mask_id=model.config.audio_mask_id,
             first_prev_ids=first_prev_ids.unsqueeze(0),
         )
+    anchor_positions = None
+    anchor_boundary_ids = None
+    if model.block_anchor_scan_head is not None:
+        if anchor_start is None:
+            anchor_start = 0
+        anchor_start = int(anchor_start)
+        if not 0 <= anchor_start < ids.size(1):
+            raise ValueError(
+                f"anchor_start must index ids, got {anchor_start} for "
+                f"length {ids.size(1)}"
+            )
+        local_len = ids.size(1) - anchor_start
+        if local_len > 32:
+            raise ValueError(
+                "block anchor scan requires one current block, got "
+                f"local length {local_len}"
+            )
+        anchor_positions = torch.arange(
+            anchor_start, ids.size(1), dtype=torch.long, device=ids.device
+        ).view(1, 1, local_len)
+        if first_prev_ids is None:
+            boundary = torch.full(
+                (model.config.num_audio_codebook,),
+                model.config.audio_mask_id,
+                dtype=ids.dtype,
+                device=ids.device,
+            )
+        else:
+            boundary = first_prev_ids
+        anchor_boundary_ids = boundary.view(1, 1, -1)
     return model._compute_audio_logits(
         h,
         input_ids=ids.unsqueeze(0),
         audio_mask=amask,
         markov_prev_ids=markov_prev_ids,
+        anchor_positions=anchor_positions,
+        anchor_boundary_ids=anchor_boundary_ids,
     )
 
 
@@ -1108,7 +1215,17 @@ def _decode_block_causal(
                     ]
                 )
                 mixed = seq.clone()
-                logits_full = _forward_slices_mixed(model, mixed, P, pos, attn)
+                logits_full = _forward_slices_mixed(
+                    model,
+                    mixed,
+                    P,
+                    pos,
+                    attn,
+                    anchor_start=L - bs,
+                    first_prev_ids=(
+                        committed[:, -1] if committed.size(1) > 0 else None
+                    ),
+                )
                 c_logits = logits_full[:, :, L - bs :, :]
                 if use_cfg:
                     if drop_ref_from_unconditional:
@@ -1151,7 +1268,16 @@ def _decode_block_causal(
                         ).to(device)
                         posu = torch.arange(Lu, device=device)
                         logits_u = _forward_slices(
-                            model, sequ, posu, attnu
+                            model,
+                            sequ,
+                            posu,
+                            attnu,
+                            anchor_start=Lu - u_len,
+                            first_prev_ids=(
+                                u_committed[:, -1]
+                                if u_committed.size(1) > 0
+                                else None
+                            ),
                         )
                         u_logits = logits_u[:, :, Lu - u_len :, :]
                     else:
@@ -1174,7 +1300,16 @@ def _decode_block_causal(
                             ]
                         )
                         logits_u = _forward_slices(
-                            model, sequ, posu, attnu
+                            model,
+                            sequ,
+                            posu,
+                            attnu,
+                            anchor_start=Lu - bs,
+                            first_prev_ids=(
+                                committed[:, -1]
+                                if committed.size(1) > 0
+                                else None
+                            ),
                         )
                         u_logits = logits_u[:, :, Lu - bs :, :]
                 else:
@@ -1566,7 +1701,16 @@ def _eos_cfg_step_trace(
     return record
 
 
-def _forward_slices_mixed(model, ids, P, positions, attn4d):
+def _forward_slices_mixed(
+    model,
+    ids,
+    P,
+    positions,
+    attn4d,
+    *,
+    anchor_start=None,
+    first_prev_ids=None,
+):
     """Forward for a mixed [text prefix | audio] row (recompute path)."""
     amask = torch.zeros((1, ids.size(1)), dtype=torch.bool, device=ids.device)
     amask[0, P:] = True
@@ -1578,10 +1722,39 @@ def _forward_slices_mixed(model, ids, P, positions, attn4d):
         return_dict=True,
     )
     h = out[0]
+    anchor_positions = None
+    anchor_boundary_ids = None
+    if model.block_anchor_scan_head is not None:
+        if anchor_start is None:
+            raise ValueError(
+                "mixed block-anchor inference requires explicit anchor_start"
+            )
+        anchor_start = int(anchor_start)
+        local_len = ids.size(1) - anchor_start
+        if not 0 < local_len <= 32:
+            raise ValueError(
+                "mixed block-anchor current length must be in [1, 32], got "
+                f"{local_len}"
+            )
+        anchor_positions = torch.arange(
+            anchor_start, ids.size(1), dtype=torch.long, device=ids.device
+        ).view(1, 1, local_len)
+        if first_prev_ids is None:
+            boundary = torch.full(
+                (model.config.num_audio_codebook,),
+                model.config.audio_mask_id,
+                dtype=ids.dtype,
+                device=ids.device,
+            )
+        else:
+            boundary = first_prev_ids
+        anchor_boundary_ids = boundary.view(1, 1, -1)
     return model._compute_audio_logits(
         h,
         input_ids=ids.unsqueeze(0),
         audio_mask=amask,
+        anchor_positions=anchor_positions,
+        anchor_boundary_ids=anchor_boundary_ids,
     )
 
 

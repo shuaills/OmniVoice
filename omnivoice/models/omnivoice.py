@@ -60,6 +60,7 @@ from transformers.modeling_outputs import ModelOutput
 from transformers.models.auto import CONFIG_MAPPING, AutoConfig
 
 from omnivoice.blockdiff_dual import KIND_ACOUSTIC
+from omnivoice.models.block_anchor_scan import SoftAnchorScanHead
 from omnivoice.models.block_markov import (
     RevealedNeighborMarkovHead,
     infer_adjacent_audio_prev_ids,
@@ -229,6 +230,11 @@ class OmniVoiceConfig(PretrainedConfig):
         audio_codebook_weights: Optional[list[float]] = None,
         block_markov_rank: int = 0,
         block_markov_seed: int = 42,
+        block_anchor_scan_dim: int = 0,
+        block_anchor_proposal_dim: int = 32,
+        block_anchor_stride: int = 8,
+        block_anchor_mode: str = "causal",
+        block_anchor_seed: int = 42,
         llm_config: Optional[Union[dict, PretrainedConfig]] = None,
         **kwargs,
     ):
@@ -248,6 +254,29 @@ class OmniVoiceConfig(PretrainedConfig):
             )
         self.block_markov_rank = int(block_markov_rank)
         self.block_markov_seed = int(block_markov_seed)
+        if block_anchor_scan_dim < 0:
+            raise ValueError(
+                "block_anchor_scan_dim must be non-negative, got "
+                f"{block_anchor_scan_dim}"
+            )
+        if block_markov_rank > 0 and block_anchor_scan_dim > 0:
+            raise ValueError(
+                "block Markov and block anchor heads are mutually exclusive"
+            )
+        if block_anchor_proposal_dim <= 0:
+            raise ValueError("block_anchor_proposal_dim must be positive")
+        if block_anchor_stride <= 0:
+            raise ValueError("block_anchor_stride must be positive")
+        if block_anchor_mode not in {"causal", "stateless"}:
+            raise ValueError(
+                "block_anchor_mode must be 'causal' or 'stateless', got "
+                f"{block_anchor_mode!r}"
+            )
+        self.block_anchor_scan_dim = int(block_anchor_scan_dim)
+        self.block_anchor_proposal_dim = int(block_anchor_proposal_dim)
+        self.block_anchor_stride = int(block_anchor_stride)
+        self.block_anchor_mode = str(block_anchor_mode)
+        self.block_anchor_seed = int(block_anchor_seed)
         if audio_codebook_weights is None:
             audio_codebook_weights = [8, 8, 6, 6, 4, 4, 2, 2]
         self.audio_codebook_weights = audio_codebook_weights
@@ -295,6 +324,9 @@ class OmniVoice(PreTrainedModel):
         self.block_markov_head = self._new_block_markov_head(
             config.block_markov_rank
         )
+        self.block_anchor_scan_head = self._new_block_anchor_scan_head(
+            config.block_anchor_scan_dim
+        )
 
         self.normalized_audio_codebook_weights = [
             w / sum(config.audio_codebook_weights)
@@ -309,6 +341,10 @@ class OmniVoice(PreTrainedModel):
             with torch.random.fork_rng(devices=[]):
                 torch.manual_seed(self.config.block_markov_seed)
                 self.block_markov_head.reset_parameters()
+        if self.block_anchor_scan_head is not None:
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(self.config.block_anchor_seed)
+                self.block_anchor_scan_head.reset_parameters()
 
         # Inference-only attributes (set by from_pretrained when not in train mode)
         self.text_tokenizer = None
@@ -316,6 +352,19 @@ class OmniVoice(PreTrainedModel):
         self.duration_estimator = None
         self.sampling_rate = None
         self._asr_pipe = None
+
+    def train(self, mode: bool = True):
+        """Keep a frozen anchor-proof backbone deterministic in train loops."""
+        super().train(mode)
+        if mode and getattr(self, "_block_anchor_freeze_base", False):
+            self.llm.eval()
+            self.audio_embeddings.eval()
+            self.audio_heads.eval()
+            if self.block_markov_head is not None:
+                self.block_markov_head.eval()
+            assert self.block_anchor_scan_head is not None
+            self.block_anchor_scan_head.train(True)
+        return self
 
     def _new_block_markov_head(
         self, rank: int
@@ -335,6 +384,8 @@ class OmniVoice(PreTrainedModel):
         """Attach a zero-output Markov head after a strict legacy load."""
         if rank <= 0:
             raise ValueError(f"rank must be positive, got {rank}")
+        if self.block_anchor_scan_head is not None:
+            raise ValueError("block Markov cannot coexist with block anchor scan")
         current_rank = int(getattr(self.config, "block_markov_rank", 0))
         if self.block_markov_head is not None:
             if current_rank != rank:
@@ -362,6 +413,72 @@ class OmniVoice(PreTrainedModel):
         self.config.block_markov_rank = int(rank)
         self.config.block_markov_seed = int(seed)
 
+    def _new_block_anchor_scan_head(
+        self, scan_dim: int
+    ) -> Optional[SoftAnchorScanHead]:
+        if scan_dim == 0:
+            return None
+        return SoftAnchorScanHead(
+            num_codebooks=self.config.num_audio_codebook,
+            vocab_size=self.config.audio_vocab_size,
+            mask_id=self.config.audio_mask_id,
+            scan_dim=scan_dim,
+            proposal_dim=self.config.block_anchor_proposal_dim,
+            stride=self.config.block_anchor_stride,
+            mode=self.config.block_anchor_mode,
+        )
+
+    def enable_block_anchor_scan_head(
+        self,
+        scan_dim: int,
+        *,
+        proposal_dim: int = 32,
+        stride: int = 8,
+        mode: str = "causal",
+        seed: Optional[int] = None,
+    ) -> None:
+        """Attach a zero-output soft-anchor scan after a strict base load."""
+        if scan_dim <= 0:
+            raise ValueError(f"scan_dim must be positive, got {scan_dim}")
+        if self.block_markov_head is not None:
+            raise ValueError("block anchor scan cannot coexist with block Markov")
+        current_dim = int(getattr(self.config, "block_anchor_scan_dim", 0))
+        if self.block_anchor_scan_head is not None:
+            expected = (
+                current_dim,
+                int(self.config.block_anchor_proposal_dim),
+                int(self.config.block_anchor_stride),
+                str(self.config.block_anchor_mode),
+            )
+            requested = (scan_dim, proposal_dim, stride, mode)
+            if expected != requested:
+                raise ValueError(
+                    "cannot change an existing block anchor architecture: "
+                    f"checkpoint={expected}, requested={requested}"
+                )
+            return
+        if current_dim not in (0, scan_dim):
+            raise ValueError(
+                "model config/head mismatch: "
+                f"config scan_dim={current_dim}, requested={scan_dim}"
+            )
+        if seed is None:
+            seed = int(getattr(self.config, "block_anchor_seed", 42))
+        self.config.block_anchor_scan_dim = int(scan_dim)
+        self.config.block_anchor_proposal_dim = int(proposal_dim)
+        self.config.block_anchor_stride = int(stride)
+        self.config.block_anchor_mode = str(mode)
+        self.config.block_anchor_seed = int(seed)
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(seed)
+            head = self._new_block_anchor_scan_head(scan_dim)
+        assert head is not None
+        head.to(
+            device=self.audio_heads.weight.device,
+            dtype=self.audio_heads.weight.dtype,
+        )
+        self.block_anchor_scan_head = head
+
     def _compute_audio_logits(
         self,
         hidden_states: torch.Tensor,
@@ -369,14 +486,23 @@ class OmniVoice(PreTrainedModel):
         input_ids: torch.Tensor,
         audio_mask: torch.Tensor,
         markov_prev_ids: Optional[torch.Tensor] = None,
+        anchor_positions: Optional[torch.Tensor] = None,
+        anchor_boundary_ids: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Project hidden states and apply the opt-in acoustic correction."""
         audio_logits = self._project_audio_logits(hidden_states)
-        return self._apply_block_markov_head(
+        audio_logits = self._apply_block_markov_head(
             audio_logits,
             input_ids=input_ids,
             audio_mask=audio_mask,
             markov_prev_ids=markov_prev_ids,
+        )
+        return self._apply_block_anchor_scan_head(
+            audio_logits,
+            input_ids=input_ids,
+            audio_mask=audio_mask,
+            anchor_positions=anchor_positions,
+            anchor_boundary_ids=anchor_boundary_ids,
         )
 
     def _project_audio_logits(
@@ -420,18 +546,21 @@ class OmniVoice(PreTrainedModel):
         labels: torch.Tensor,
         loss_kind: Optional[torch.Tensor],
     ) -> torch.Tensor:
-        """Train the Markov head only on content-acoustic supervision.
+        """Train auxiliary acoustic heads only on content supervision.
 
         EOS and VOID rows are part of the stopping contract even when their
         target ids happen to be ordinary codec tokens.  They therefore use
         the untouched backbone logits exactly.  This also avoids bf16
         log-partition round-off becoming a structural training signal.
         """
-        if self.block_markov_head is None:
+        if (
+            self.block_markov_head is None
+            and self.block_anchor_scan_head is None
+        ):
             return corrected_audio_logits
         if loss_kind is None:
             raise ValueError(
-                "block Markov training requires loss_kind so EOS/VOID rows "
+                "auxiliary acoustic-head training requires loss_kind so EOS/VOID rows "
                 "cannot silently train the acoustic head"
             )
         acoustic_targets = loss_kind.eq(KIND_ACOUSTIC) & labels.ne(-100)
@@ -439,6 +568,30 @@ class OmniVoice(PreTrainedModel):
             acoustic_targets.unsqueeze(-1),
             corrected_audio_logits,
             base_audio_logits,
+        )
+
+    def _apply_block_anchor_scan_head(
+        self,
+        audio_logits: torch.Tensor,
+        *,
+        input_ids: torch.Tensor,
+        audio_mask: torch.Tensor,
+        anchor_positions: Optional[torch.Tensor],
+        anchor_boundary_ids: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        if self.block_anchor_scan_head is None:
+            return audio_logits
+        if anchor_positions is None or anchor_boundary_ids is None:
+            raise ValueError(
+                "block anchor scan requires explicit block-local layout; "
+                "legacy whole-sequence inference is not supported"
+            )
+        return self.block_anchor_scan_head(
+            audio_logits,
+            input_ids,
+            audio_mask,
+            anchor_positions,
+            anchor_boundary_ids,
         )
 
     @classmethod
@@ -591,6 +744,8 @@ class OmniVoice(PreTrainedModel):
         block_ids: Optional[torch.Tensor] = None,
         loss_kind: Optional[torch.Tensor] = None,
         markov_prev_ids: Optional[torch.Tensor] = None,
+        anchor_positions: Optional[torch.Tensor] = None,
+        anchor_boundary_ids: Optional[torch.Tensor] = None,
     ):
         if self.block_markov_head is not None and markov_prev_ids is None and (
             labels is not None
@@ -602,6 +757,13 @@ class OmniVoice(PreTrainedModel):
                 "block Markov training/packed forward requires explicit "
                 "markov_prev_ids; adjacent inference is only valid for a "
                 "single contiguous audio timeline"
+            )
+        if self.block_anchor_scan_head is not None and (
+            anchor_positions is None or anchor_boundary_ids is None
+        ):
+            raise ValueError(
+                "block anchor training/inference requires explicit block-local "
+                "anchor_positions and anchor_boundary_ids"
             )
 
         inputs_embeds = self._prepare_embed_inputs(input_ids, audio_mask)
@@ -716,6 +878,13 @@ class OmniVoice(PreTrainedModel):
             input_ids=input_ids,
             audio_mask=audio_mask,
             markov_prev_ids=markov_prev_ids,
+        )
+        audio_logits = self._apply_block_anchor_scan_head(
+            audio_logits,
+            input_ids=input_ids,
+            audio_mask=audio_mask,
+            anchor_positions=anchor_positions,
+            anchor_boundary_ids=anchor_boundary_ids,
         )
 
         if labels is not None:

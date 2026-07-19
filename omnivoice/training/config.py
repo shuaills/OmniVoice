@@ -79,6 +79,17 @@ class TrainingConfig:
     # transition width.  This is experimental and only supported by B2 dual
     # block training.
     block_markov_rank: int = 0
+    # DSpark-style proposal scan. The frozen parallel backbone proposes sparse
+    # anchors; a tiny block-local state carries only earlier anchors forward.
+    # Zero disables the structure. It is intentionally separate from the
+    # legacy block_markov_* checkpoint contract.
+    block_anchor_scan_dim: int = 0
+    block_anchor_proposal_dim: int = 32
+    block_anchor_stride: int = 8
+    block_anchor_mode: str = "causal"
+    # Mechanism-proof option: freeze every parameter except the anchor head.
+    # This is fail-closed and only legal when block_anchor_scan_dim > 0.
+    block_anchor_freeze_base: bool = False
     # "single" = B1 right-truncation (attention untouched);
     # "dual"   = B2 two-copy block-causal attention (flex_attention only).
     block_scheme: str = "single"

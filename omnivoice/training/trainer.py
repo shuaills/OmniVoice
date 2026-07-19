@@ -178,8 +178,23 @@ class OmniTrainer:
 
     def create_optimizer_and_scheduler(self):
         """Default AdamW + configurable LR Scheduler."""
+        if getattr(self.model, "_block_anchor_freeze_base", False):
+            trainable_parameters = [
+                parameter for parameter in self.model.parameters()
+                if parameter.requires_grad
+            ]
+            if not trainable_parameters:
+                raise RuntimeError(
+                    "anchor-only training has no parameters with "
+                    "requires_grad=True"
+                )
+        else:
+            # Preserve the historical optimizer/checkpoint parameter ordering
+            # for every existing training mode.  Filtering frozen parameters
+            # is an explicit contract only for the anchor mechanism proof.
+            trainable_parameters = list(self.model.parameters())
         optimizer = torch.optim.AdamW(
-            self.model.parameters(),
+            trainable_parameters,
             lr=self.config.learning_rate,
             weight_decay=self.config.weight_decay,
             fused=getattr(self.config, "perf_fused_adamw", False) or None,

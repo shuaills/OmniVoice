@@ -342,6 +342,46 @@ def build_model_and_tokenizer(
             "block_markov_rank > 0 requires split_loss so content, EOS, and "
             "VOID supervision remain explicitly separated"
         )
+    if config.block_anchor_scan_dim < 0:
+        raise ValueError("block_anchor_scan_dim must be non-negative")
+    if config.block_markov_rank > 0 and config.block_anchor_scan_dim > 0:
+        raise ValueError(
+            "block_markov_rank and block_anchor_scan_dim are mutually exclusive"
+        )
+    if config.block_anchor_scan_dim > 0 and not (
+        config.block_training and config.block_scheme == "dual"
+    ):
+        raise ValueError(
+            "block_anchor_scan_dim > 0 requires block_training with "
+            "block_scheme='dual'"
+        )
+    if config.block_anchor_scan_dim > 0 and not config.split_loss:
+        raise ValueError(
+            "block_anchor_scan_dim > 0 requires split_loss so content, EOS, "
+            "and VOID supervision remain explicitly separated"
+        )
+    if config.block_anchor_scan_dim > 0:
+        if config.block_anchor_proposal_dim <= 0:
+            raise ValueError("block_anchor_proposal_dim must be positive")
+        if config.block_anchor_stride <= 1:
+            raise ValueError("block_anchor_stride must be greater than one")
+        if config.block_size != 32:
+            raise ValueError(
+                "block anchor scan currently requires block_size == 32 so "
+                "training and both generation paths share one contract"
+            )
+        if config.block_size % config.block_anchor_stride != 0:
+            raise ValueError(
+                "block_size must be divisible by block_anchor_stride"
+            )
+        if config.block_anchor_mode not in {"causal", "stateless"}:
+            raise ValueError(
+                "block_anchor_mode must be 'causal' or 'stateless'"
+            )
+    if config.block_anchor_freeze_base and config.block_anchor_scan_dim == 0:
+        raise ValueError(
+            "block_anchor_freeze_base requires block_anchor_scan_dim > 0"
+        )
 
     # 1. Tokenizer
     tokenizer_path = (
@@ -428,6 +468,59 @@ def build_model_and_tokenizer(
                 f"checkpoint={loaded_markov_rank}, "
                 f"requested={config.block_markov_rank}"
             )
+        loaded_anchor_dim = int(
+            getattr(model.config, "block_anchor_scan_dim", 0)
+        )
+        if loaded_anchor_dim == 0 and config.block_anchor_scan_dim > 0:
+            model.enable_block_anchor_scan_head(
+                config.block_anchor_scan_dim,
+                proposal_dim=config.block_anchor_proposal_dim,
+                stride=config.block_anchor_stride,
+                mode=config.block_anchor_mode,
+                seed=config.seed,
+            )
+            embedding_hash = hashlib.sha256(
+                model.block_anchor_scan_head.proposal_embeddings.weight.detach()
+                .cpu()
+                .contiguous()
+                .numpy()
+                .tobytes()
+            ).hexdigest()[:16]
+            logger.info(
+                "Attached zero-output block anchor scan "
+                "(scan_dim=%d, proposal_dim=%d, stride=%d, "
+                "mode=%s, params=%d, seed=%d, embedding_sha256=%s)",
+                config.block_anchor_scan_dim,
+                config.block_anchor_proposal_dim,
+                config.block_anchor_stride,
+                config.block_anchor_mode,
+                model.block_anchor_scan_head.parameter_count,
+                config.seed,
+                embedding_hash,
+            )
+        elif loaded_anchor_dim != config.block_anchor_scan_dim:
+            raise ValueError(
+                "block_anchor_scan_dim does not match checkpoint: "
+                f"checkpoint={loaded_anchor_dim}, "
+                f"requested={config.block_anchor_scan_dim}"
+            )
+        elif loaded_anchor_dim > 0:
+            loaded_contract = (
+                int(model.config.block_anchor_proposal_dim),
+                int(model.config.block_anchor_stride),
+                str(model.config.block_anchor_mode),
+            )
+            requested_contract = (
+                config.block_anchor_proposal_dim,
+                config.block_anchor_stride,
+                config.block_anchor_mode,
+            )
+            if loaded_contract != requested_contract:
+                raise ValueError(
+                    "block anchor architecture does not match checkpoint: "
+                    f"checkpoint={loaded_contract}, "
+                    f"requested={requested_contract}"
+                )
     else:
         resolved_llm = _resolve_model_path(config.llm_name_or_path)
         llm_config = AutoConfig.from_pretrained(resolved_llm)
@@ -439,6 +532,11 @@ def build_model_and_tokenizer(
             audio_codebook_weights=config.audio_codebook_weights,
             block_markov_rank=config.block_markov_rank,
             block_markov_seed=config.seed,
+            block_anchor_scan_dim=config.block_anchor_scan_dim,
+            block_anchor_proposal_dim=config.block_anchor_proposal_dim,
+            block_anchor_stride=config.block_anchor_stride,
+            block_anchor_mode=config.block_anchor_mode,
+            block_anchor_seed=config.seed,
             llm_config=llm_config,
         )
 
@@ -460,6 +558,31 @@ def build_model_and_tokenizer(
         if len(tokenizer) != embedding_rows:
             model.llm.resize_token_embeddings(len(tokenizer))
         _synchronize_model_text_vocab_config(model, tokenizer)
+
+    if config.block_anchor_freeze_base:
+        if model.block_anchor_scan_head is None:
+            raise RuntimeError("anchor freeze requested without an attached head")
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        for parameter in model.block_anchor_scan_head.parameters():
+            parameter.requires_grad_(True)
+        model._block_anchor_freeze_base = True
+        trainable = [
+            name for name, parameter in model.named_parameters()
+            if parameter.requires_grad
+        ]
+        if not trainable or any(
+            not name.startswith("block_anchor_scan_head.") for name in trainable
+        ):
+            raise RuntimeError(
+                "anchor-only optimizer whitelist contains non-head parameters: "
+                f"{trainable[:20]}"
+            )
+        logger.info(
+            "Block anchor mechanism proof: frozen backbone, %d trainable "
+            "head tensors only",
+            len(trainable),
+        )
 
     # ---- perf experiment hooks (perf/step-time-20260708; default OFF) ----
     if config.perf_blockmask_cache:
@@ -665,6 +788,7 @@ def build_dataloaders(
                 **processor_kwargs,
                 block_size=config.block_size,
                 block_markov_prev_ids=config.block_markov_rank > 0,
+                block_anchor_layout=config.block_anchor_scan_dim > 0,
                 turn_boundary_prompt_prob=getattr(
                     config, "turn_boundary_prompt_prob", 0.0
                 ),

@@ -197,6 +197,42 @@ class PackingDataCollator:
             )
             return_list["markov_prev_ids"] = markov_prev_ids.unsqueeze(0)
 
+        _has_anchor_positions = [
+            "anchor_positions" in sample for sample in processed_samples
+        ]
+        _has_anchor_boundaries = [
+            "anchor_boundary_ids" in sample for sample in processed_samples
+        ]
+        if _has_anchor_positions != _has_anchor_boundaries:
+            raise AssertionError(
+                "anchor_positions and anchor_boundary_ids must appear together"
+            )
+        if any(_has_anchor_positions) and not all(_has_anchor_positions):
+            raise AssertionError(
+                "mixed block-anchor layout presence in one pack: "
+                f"{sum(_has_anchor_positions)}/{len(_has_anchor_positions)}"
+            )
+        if all(_has_anchor_positions):
+            packed_positions = []
+            packed_boundaries = []
+            sequence_offset = 0
+            for sample in processed_samples:
+                positions = sample["anchor_positions"].clone()
+                positions = torch.where(
+                    positions.ge(0),
+                    positions + sequence_offset,
+                    positions,
+                )
+                packed_positions.append(positions)
+                packed_boundaries.append(sample["anchor_boundary_ids"])
+                sequence_offset += sample["length"]
+            return_list["anchor_positions"] = torch.cat(
+                packed_positions, dim=0
+            ).unsqueeze(0)
+            return_list["anchor_boundary_ids"] = torch.cat(
+                packed_boundaries, dim=0
+            ).unsqueeze(0)
+
         document_ids_list = []
 
         for i, s in enumerate(processed_samples):
