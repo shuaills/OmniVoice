@@ -9,9 +9,18 @@ from pathlib import Path
 
 import torch
 
-from omnivoice.blockdiff_dual import TAG_NOISY
+from omnivoice.blockdiff import block_eos_id
+from omnivoice.blockdiff_dual import (
+    KIND_ACOUSTIC,
+    KIND_EOS,
+    KIND_IGNORE,
+    KIND_VOID,
+    SILENCE_FRAME_TOKENS,
+    TAG_NOISY,
+)
 from omnivoice.training.builder import build_model_and_tokenizer
 from omnivoice.training.config import TrainingConfig
+from omnivoice.training.split_loss import category_counts
 
 
 def main() -> None:
@@ -32,6 +41,10 @@ def main() -> None:
     config.perf_train_no_cache = True
     model, _ = build_model_and_tokenizer(config)
     model.eval()
+    if not getattr(model, "_split_loss", False):
+        raise SystemExit("causal config did not enable the split-loss contract")
+    if getattr(model, "_eos_band_k", None) != config.eos_band_k:
+        raise SystemExit("model/config EOS-band contract mismatch")
     head = model.block_anchor_scan_head
     if head is None:
         raise SystemExit("causal config did not attach an anchor head")
@@ -71,19 +84,78 @@ def main() -> None:
         raise SystemExit("real bf16 attachment preflight requires CUDA")
     device = torch.device("cuda:0")
     model.to(device)
-    packed = {
-        "input_ids": torch.full(
-            (batch, model.config.num_audio_codebook, frames),
-            model.config.audio_mask_id,
+    targets = (
+        torch.arange(
+            model.config.num_audio_codebook * frames,
             dtype=torch.long,
             device=device,
-        ),
+        )
+        .view(1, model.config.num_audio_codebook, frames)
+        .remainder(model.config.audio_mask_id)
+    )
+    synthetic_input_ids = torch.full_like(targets, model.config.audio_mask_id)
+    synthetic_input_ids[:, :, 0] = targets[:, :, 0]
+    labels = torch.full_like(targets, -100)
+    loss_kind = torch.full_like(labels, KIND_IGNORE, dtype=torch.uint8)
+    eos_start = frames - config.eos_band_k - 1
+    if eos_start <= 1:
+        raise SystemExit("synthetic split-loss batch has no acoustic supervision")
+    void_start = eos_start + config.eos_band_k
+    labels[:, :, 1:eos_start] = targets[:, :, 1:eos_start]
+    loss_kind[:, :, 1:eos_start] = KIND_ACOUSTIC
+    labels[:, 0, eos_start:void_start] = block_eos_id(
+        model.config.audio_mask_id
+    )
+    loss_kind[:, 0, eos_start:void_start] = KIND_EOS
+    labels[:, :, void_start:] = SILENCE_FRAME_TOKENS[
+        : model.config.num_audio_codebook
+    ].to(device).view(1, -1, 1)
+    loss_kind[:, :, void_start:] = KIND_VOID
+    if not torch.equal(loss_kind.eq(KIND_IGNORE), labels.eq(-100)):
+        raise SystemExit("synthetic split-loss labels violate IGNORE <-> -100")
+    valid_labels = labels.ne(-100)
+    if (
+        labels[valid_labels].min().item() < 0
+        or labels[valid_labels].max().item() >= model.config.audio_vocab_size
+    ):
+        raise SystemExit("synthetic split-loss target escaped the audio vocabulary")
+    document_ids = torch.zeros(batch, frames, dtype=torch.int32, device=device)
+    counts = category_counts(loss_kind, document_ids)
+    expected_audio_count = torch.full(
+        (model.config.num_audio_codebook,),
+        eos_start - 1,
+        dtype=torch.int64,
+        device=device,
+    )
+    expected_void_count = torch.ones(
+        model.config.num_audio_codebook,
+        dtype=torch.int64,
+        device=device,
+    )
+    if (
+        counts.invariant_errors.item() != 0
+        or counts.eos_count.item() != 1
+        or counts.void_events.item() != 1
+        or not torch.equal(counts.audio_count, expected_audio_count)
+        or not torch.equal(counts.void_count, expected_void_count)
+        or counts.void_displaced.item()
+        != (config.eos_band_k - 1) * model.config.num_audio_codebook
+    ):
+        raise SystemExit(
+            "synthetic split-loss batch violates training coordinator gates: "
+            f"invariant_errors={counts.invariant_errors.item()} "
+            f"eos_count={counts.eos_count.item()} "
+            f"void_events={counts.void_events.item()} "
+            f"audio_count={counts.audio_count} "
+            f"void_count={counts.void_count} "
+            f"void_displaced={counts.void_displaced.item()}"
+        )
+    packed = {
+        "input_ids": synthetic_input_ids,
         "audio_mask": torch.ones(
             batch, frames, dtype=torch.bool, device=device
         ),
-        "document_ids": torch.zeros(
-            batch, frames, dtype=torch.int32, device=device
-        ),
+        "document_ids": document_ids,
         "position_ids": torch.arange(
             frames, dtype=torch.long, device=device
         ).view(1, -1),
@@ -95,16 +167,20 @@ def main() -> None:
         ),
         "anchor_positions": positions.to(device),
         "anchor_boundary_ids": boundaries.to(device),
+        "labels": labels,
+        "loss_kind": loss_kind,
     }
     with torch.inference_mode(), torch.autocast(
         device_type="cuda", dtype=torch.bfloat16
     ):
-        full_on = model(**packed).logits
+        full_on_output = model(**packed)
         model.block_anchor_scan_head = None
         try:
-            full_off = model(**packed).logits
+            full_off_output = model(**packed)
         finally:
             model.block_anchor_scan_head = head
+    full_on = full_on_output.logits
+    full_off = full_off_output.logits
     if full_on.dtype != torch.float32:
         raise SystemExit(
             f"full head-on forward must return fp32 logits, got {full_on.dtype}"
@@ -113,14 +189,48 @@ def main() -> None:
         raise SystemExit("zero-output head changed the full packed forward")
     if not torch.isfinite(full_on).all() or not torch.isfinite(full_off).all():
         raise SystemExit("full packed head on/off forward produced non-finite logits")
-    del full_on, full_off, packed
+    for name, output in (("head_on", full_on_output), ("head_off", full_off_output)):
+        if output.legacy_loss is None or not torch.isfinite(output.legacy_loss):
+            raise SystemExit(f"{name} split-loss legacy loss is missing or non-finite")
+        if output.audio_sum is None or not torch.isfinite(output.audio_sum).all():
+            raise SystemExit(f"{name} split-loss acoustic numerator is invalid")
+        if output.eos_sum is None or not torch.isfinite(output.eos_sum):
+            raise SystemExit(f"{name} split-loss EOS numerator is invalid")
+        if output.void_event_sum is None or not torch.isfinite(output.void_event_sum):
+            raise SystemExit(f"{name} split-loss VOID numerator is invalid")
+        if not torch.equal(output.audio_count, expected_audio_count):
+            raise SystemExit(
+                f"{name} split-loss acoustic count mismatch: "
+                f"{output.audio_count} != {expected_audio_count}"
+            )
+        if output.eos_count.item() != 1 or output.void_events.item() != 1:
+            raise SystemExit(f"{name} synthetic split-loss EOS/VOID count mismatch")
+        if not torch.equal(
+            output.void_count,
+            expected_void_count,
+        ):
+            raise SystemExit(f"{name} synthetic split-loss VOID cells mismatch")
+    del full_on, full_off, full_on_output, full_off_output, packed
 
     # Full-softmax proposals must be detached from the frozen backbone.
-    probe_logits = torch.randn(1, 1, head.num_codebooks, head.mask_id, requires_grad=True)
-    probe_ids = torch.full((1, 1, head.num_codebooks), head.mask_id)
+    probe_logits = torch.randn(
+        1,
+        1,
+        head.num_codebooks,
+        head.mask_id,
+        device=device,
+        requires_grad=True,
+    )
+    probe_ids = torch.full(
+        (1, 1, head.num_codebooks),
+        head.mask_id,
+        dtype=torch.long,
+        device=device,
+    )
     head._proposal_features(probe_ids, probe_logits).sum().backward()
     if probe_logits.grad is not None:
         raise SystemExit("proposal features leaked gradients into base logits")
+    head.zero_grad(set_to_none=True)
 
     # Exercise the real checkpoint-attached module in its production bf16
     # input regime.  A fresh synthetic fp32 head would not catch the accidental
@@ -175,7 +285,8 @@ def main() -> None:
         f"params={head.parameter_count} trainable_tensors={len(trainable)} "
         f"embedding_sha256={embedding_hash} correction_dtype={causal.dtype} "
         f"partition_delta={partition_delta:.6g} "
-        "full_model_synthetic_packed_forward=PASS"
+        "full_model_synthetic_packed_forward=PASS "
+        "split_loss_training_contract=PASS"
     )
 
 

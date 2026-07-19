@@ -212,15 +212,125 @@ def test_bf16_attach_and_forward_microbenchmark_are_hard_gates():
     assert 'device = torch.device("cuda:0")' in attach
     assert "causal.dtype != torch.float32" in attach
     assert "partition_delta > 5e-6" in attach
-    assert "full_model_synthetic_packed_forward=PASS" in attach
-    assert "full_on = model(**packed).logits" in attach
-    assert "full_off = model(**packed).logits" in attach
+    attach_marker = "full_model_synthetic_packed_forward=PASS"
+    assert attach_marker in attach
+    assert attach_marker in (
+        ROOT / "dspark_anchor_scan_recover_eval.sh"
+    ).read_text()
+    assert "split_loss_training_contract=PASS" in attach
+    assert '"labels": labels' in attach
+    assert '"loss_kind": loss_kind' in attach
+    assert "loss_kind.eq(KIND_IGNORE), labels.eq(-100)" in attach
+    assert "counts = category_counts(loss_kind, document_ids)" in attach
+    assert "counts.invariant_errors.item() != 0" in attach
+    assert "counts.void_displaced.item()" in attach
+    assert "labels[:, 0, eos_start:void_start] = block_eos_id" in attach
+    assert "loss_kind[:, :, void_start:] = KIND_VOID" in attach
+    assert 'getattr(model, "_split_loss", False)' in attach
+    assert "full_on_output = model(**packed)" in attach
+    assert "full_off_output = model(**packed)" in attach
+    assert "output.audio_count, expected_audio_count" in attach
+    assert "output.legacy_loss is None" in attach
+    assert "device=device,\n        requires_grad=True" in attach
+    assert "head.zero_grad(set_to_none=True)" in attach
     assert "config.perf_flex_bf16_qkv = True" in attach
     assert "def _benchmark_head_on_off(" in nll
     assert "MIN_HEAD_ON_THROUGHPUT_RATIO = 0.95" in nll
     assert "0.08 * off_peak_mib" in nll
     assert "MAX_HEAD_ON_MEMORY_DELTA_MIB" in nll
     assert '"measurement_order": "alternating_head_off_first/head_on_first"' in nll
+
+
+def test_attach_smoke_split_loss_batch_is_functional():
+    if importlib.util.find_spec("torch") is None:
+        import pytest
+
+        pytest.skip("local campaign test environment has no torch")
+
+    import torch
+    from transformers import PretrainedConfig
+
+    from omnivoice.blockdiff import block_eos_id
+    from omnivoice.blockdiff_dual import (
+        KIND_ACOUSTIC,
+        KIND_EOS,
+        KIND_IGNORE,
+        KIND_VOID,
+    )
+    from omnivoice.models.omnivoice import OmniVoice, OmniVoiceConfig
+    from omnivoice.training.split_loss import category_counts
+
+    class TinyLLM(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embedding = torch.nn.Embedding(16, 8)
+
+        def get_input_embeddings(self):
+            return self.embedding
+
+        def set_input_embeddings(self, value):
+            self.embedding = value
+
+        def forward(self, inputs_embeds, **kwargs):
+            return (inputs_embeds,)
+
+    config = OmniVoiceConfig(
+        audio_vocab_size=9,
+        audio_mask_id=7,
+        num_audio_codebook=2,
+        audio_codebook_weights=[1, 1],
+        llm_config=PretrainedConfig(hidden_size=8, vocab_size=16),
+    )
+    model = OmniVoice(config, llm=TinyLLM()).eval()
+    model.enable_block_anchor_scan_head(
+        6, proposal_dim=3, stride=2, mode="causal", seed=20260719
+    )
+    model._split_loss = True
+    model._eos_band_k = 2
+
+    frames = 5
+    targets = torch.arange(2 * frames).view(1, 2, frames).remainder(7)
+    input_ids = torch.full_like(targets, 7)
+    input_ids[:, :, 0] = targets[:, :, 0]
+    labels = torch.full_like(targets, -100)
+    labels[:, :, 1] = targets[:, :, 1]
+    labels[:, 0, 2:4] = block_eos_id(7)
+    labels[:, :, 4] = torch.tensor([1, 2])
+    loss_kind = torch.full_like(labels, KIND_IGNORE, dtype=torch.uint8)
+    loss_kind[:, :, 1] = KIND_ACOUSTIC
+    loss_kind[:, 0, 2:4] = KIND_EOS
+    loss_kind[:, :, 4] = KIND_VOID
+    document_ids = torch.zeros(1, frames, dtype=torch.int32)
+    counts = category_counts(loss_kind, document_ids)
+    assert counts.invariant_errors.item() == 0
+    assert counts.eos_count.item() == 1
+    assert counts.void_events.item() == 1
+    packed = {
+        "input_ids": input_ids,
+        "audio_mask": torch.ones(1, frames, dtype=torch.bool),
+        "labels": labels,
+        "loss_kind": loss_kind,
+        "document_ids": document_ids,
+        "anchor_positions": torch.arange(frames).view(1, 1, frames),
+        "anchor_boundary_ids": torch.full((1, 1, 2), 7, dtype=torch.long),
+    }
+    attached = model(**packed)
+    head = model.block_anchor_scan_head
+    model.block_anchor_scan_head = None
+    try:
+        baseline = model(**packed)
+    finally:
+        model.block_anchor_scan_head = head
+
+    assert torch.equal(attached.logits, baseline.logits)
+    assert torch.equal(attached.audio_count, torch.tensor([1, 1]))
+    assert attached.eos_count.item() == 1
+    assert torch.equal(attached.void_count, torch.ones(2, dtype=torch.int64))
+    assert attached.void_events.item() == 1
+    assert torch.isfinite(attached.legacy_loss)
+    assert torch.isfinite(attached.audio_sum).all()
+    assert torch.isfinite(attached.eos_sum)
+    assert torch.isfinite(attached.void_event_sum)
 
 
 def test_eval_preserves_required_bf16_flex_attention_contract():
