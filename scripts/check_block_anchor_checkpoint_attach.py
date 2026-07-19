@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from omnivoice.blockdiff_dual import TAG_NOISY
 from omnivoice.training.builder import build_model_and_tokenizer
 from omnivoice.training.config import TrainingConfig
 
@@ -24,11 +25,11 @@ def main() -> None:
         config.init_from_checkpoint = str(args.checkpoint.resolve())
     config.perf_liger = False
     config.perf_fused_adamw = False
-    config.perf_flex_bf16_qkv = False
+    config.perf_flex_bf16_qkv = True
     config.perf_torch_compile = False
     config.perf_compile_dynamic = False
     config.perf_grad_checkpoint = False
-    config.perf_train_no_cache = False
+    config.perf_train_no_cache = True
     model, _ = build_model_and_tokenizer(config)
     model.eval()
     head = model.block_anchor_scan_head
@@ -63,6 +64,57 @@ def main() -> None:
     if torch.count_nonzero(head.output.weight).item() != 0:
         raise SystemExit("attached output projection is not exactly zero")
 
+    # Exercise the same full FlexAttention path used by the NLL proof before
+    # spending time on any training arm.  A head-only tensor diagnostic cannot
+    # catch Qwen3 q/k fp32 promotion against a bf16 value tensor.
+    if not torch.cuda.is_available():
+        raise SystemExit("real bf16 attachment preflight requires CUDA")
+    device = torch.device("cuda:0")
+    model.to(device)
+    packed = {
+        "input_ids": torch.full(
+            (batch, model.config.num_audio_codebook, frames),
+            model.config.audio_mask_id,
+            dtype=torch.long,
+            device=device,
+        ),
+        "audio_mask": torch.ones(
+            batch, frames, dtype=torch.bool, device=device
+        ),
+        "document_ids": torch.zeros(
+            batch, frames, dtype=torch.int32, device=device
+        ),
+        "position_ids": torch.arange(
+            frames, dtype=torch.long, device=device
+        ).view(1, -1),
+        "copy_tags": torch.full(
+            (batch, frames), TAG_NOISY, dtype=torch.int32, device=device
+        ),
+        "block_ids": torch.zeros(
+            batch, frames, dtype=torch.int32, device=device
+        ),
+        "anchor_positions": positions.to(device),
+        "anchor_boundary_ids": boundaries.to(device),
+    }
+    with torch.inference_mode(), torch.autocast(
+        device_type="cuda", dtype=torch.bfloat16
+    ):
+        full_on = model(**packed).logits
+        model.block_anchor_scan_head = None
+        try:
+            full_off = model(**packed).logits
+        finally:
+            model.block_anchor_scan_head = head
+    if full_on.dtype != torch.float32:
+        raise SystemExit(
+            f"full head-on forward must return fp32 logits, got {full_on.dtype}"
+        )
+    if not torch.equal(full_on, full_off.float()):
+        raise SystemExit("zero-output head changed the full packed forward")
+    if not torch.isfinite(full_on).all() or not torch.isfinite(full_off).all():
+        raise SystemExit("full packed head on/off forward produced non-finite logits")
+    del full_on, full_off, packed
+
     # Full-softmax proposals must be detached from the frozen backbone.
     probe_logits = torch.randn(1, 1, head.num_codebooks, head.mask_id, requires_grad=True)
     probe_ids = torch.full((1, 1, head.num_codebooks), head.mask_id)
@@ -73,9 +125,6 @@ def main() -> None:
     # Exercise the real checkpoint-attached module in its production bf16
     # input regime.  A fresh synthetic fp32 head would not catch the accidental
     # bf16 downcast that previously hid ~1e-3 partition drift.
-    if not torch.cuda.is_available():
-        raise SystemExit("real bf16 attachment preflight requires CUDA")
-    device = torch.device("cuda:0")
     diagnostic = head.to(device=device, dtype=torch.bfloat16)
     with torch.no_grad():
         diagnostic.output.weight.normal_(0.0, 1e-3)
@@ -125,7 +174,8 @@ def main() -> None:
         "BLOCK_ANCHOR_REAL_ATTACH_OK "
         f"params={head.parameter_count} trainable_tensors={len(trainable)} "
         f"embedding_sha256={embedding_hash} correction_dtype={causal.dtype} "
-        f"partition_delta={partition_delta:.6g}"
+        f"partition_delta={partition_delta:.6g} "
+        "full_model_synthetic_packed_forward=PASS"
     )
 
 

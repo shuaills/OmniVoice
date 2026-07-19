@@ -10,6 +10,7 @@ import json
 import math
 import random
 import statistics
+import subprocess
 import time
 from pathlib import Path
 
@@ -75,7 +76,12 @@ def _config(path: Path, checkpoint: Path, *, enabled: bool) -> TrainingConfig:
     config.perf_grad_checkpoint = False
     config.perf_liger = False
     config.perf_fused_adamw = False
-    config.perf_flex_bf16_qkv = False
+    # This is a correctness requirement for the fp32-master Qwen3 checkpoint,
+    # not merely a training-speed toggle.  Qwen3 RMSNorm promotes q/k to fp32
+    # while value remains bf16; FlexAttention rejects that mixed triplet.  The
+    # production training contract therefore casts q/k/v together at the
+    # attention boundary, and evaluation must preserve the same forward path.
+    config.perf_flex_bf16_qkv = True
     config.perf_torch_compile = False
     config.perf_compile_dynamic = False
     config.perf_train_no_cache = True
@@ -453,6 +459,14 @@ def _logits_hash(logits: torch.Tensor) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _load_model(config_path: Path, checkpoint: Path, *, enabled: bool, device):
     config = _config(config_path, checkpoint, enabled=enabled)
     model, _ = build_model_and_tokenizer(config)
@@ -816,6 +830,31 @@ def main() -> None:
         verdict = "SCIENTIFIC_KILL"
     else:
         verdict = "INCONCLUSIVE_1K"
+    source_root = Path(__file__).resolve().parents[1]
+    source_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=source_root, text=True
+    ).strip()
+    config_provenance = {
+        name: {
+            "path": str(path.resolve()),
+            "sha256": _file_sha256(path.resolve()),
+        }
+        for name, path in (
+            ("causal", args.causal_config),
+            ("stateless", args.stateless_config),
+        )
+    }
+    checkpoint_provenance = {
+        name: {
+            "path": str(path.resolve()),
+            "model_sha256": _file_sha256(path.resolve() / "model.safetensors"),
+        }
+        for name, path in (
+            ("base", args.base_checkpoint),
+            ("causal", args.causal_checkpoint),
+            ("stateless", args.stateless_checkpoint),
+        )
+    }
     report = {
         "verdict": verdict,
         "generation_status": "NEEDS_GENERATION",
@@ -827,6 +866,12 @@ def main() -> None:
         "num_packs": args.num_packs,
         "snapshot_sha256": snapshot_hash,
         "proposal_contract": "full_acoustic_softmax_expectation",
+        "provenance": {
+            "source_root": str(source_root),
+            "source_commit": source_commit,
+            "configs": config_provenance,
+            "checkpoints": checkpoint_provenance,
+        },
         "base": base,
         "causal_on": causal_on,
         "causal_off": causal_off,

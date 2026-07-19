@@ -212,11 +212,46 @@ def test_bf16_attach_and_forward_microbenchmark_are_hard_gates():
     assert 'device = torch.device("cuda:0")' in attach
     assert "causal.dtype != torch.float32" in attach
     assert "partition_delta > 5e-6" in attach
+    assert "full_model_synthetic_packed_forward=PASS" in attach
+    assert "full_on = model(**packed).logits" in attach
+    assert "full_off = model(**packed).logits" in attach
+    assert "config.perf_flex_bf16_qkv = True" in attach
     assert "def _benchmark_head_on_off(" in nll
     assert "MIN_HEAD_ON_THROUGHPUT_RATIO = 0.95" in nll
     assert "0.08 * off_peak_mib" in nll
     assert "MAX_HEAD_ON_MEMORY_DELTA_MIB" in nll
     assert '"measurement_order": "alternating_head_off_first/head_on_first"' in nll
+
+
+def test_eval_preserves_required_bf16_flex_attention_contract():
+    if importlib.util.find_spec("torch") is None:
+        import pytest
+
+        pytest.skip("local campaign test environment has no torch")
+    from scripts.eval_block_anchor_nll import _config
+
+    for enabled in (False, True):
+        config = _config(
+            ROOT / "examples/config/train_config_cfg90100_anchor_causal_s300.json",
+            Path("/tmp/block-anchor-contract-only-checkpoint"),
+            enabled=enabled,
+        )
+        assert config.attn_implementation == "flex_attention"
+        assert config.perf_flex_bf16_qkv is True
+
+
+def test_nll_and_recovery_receipt_bind_evaluation_inputs():
+    nll = (ROOT / "scripts/eval_block_anchor_nll.py").read_text()
+    receipt = (ROOT / "scripts/finalize_block_anchor_receipt.py").read_text()
+    assert '"provenance": {' in nll
+    assert '"source_commit": source_commit' in nll
+    assert '"model_sha256": _file_sha256' in nll
+    assert '"configs": config_provenance' in nll
+    assert 'choices=("standard", "recovery_eval_only")' in receipt
+    assert '"training_reexecuted": False' in receipt
+    assert '"flex_attention_qkv_dtype_mismatch_v1"' in receipt
+    assert "NLL checkpoint provenance mismatch" in receipt
+    assert "fixed 32-pack snapshot receipt" in receipt
 
 
 def test_layout_proves_exact_noisy_coverage_and_committed_boundary():
@@ -275,7 +310,15 @@ def test_receipt_has_closed_verdict_vocabulary_and_no_followup():
     with tempfile.TemporaryDirectory() as temporary:
         temporary = Path(temporary)
         manifest = temporary / "run.manifest.txt"
-        manifest.write_text("run_id=test\nsource_commit=deadbeef\n")
+        manifest.write_text(
+            "run_id=test\n"
+            "source_commit=deadbeef\n"
+            "seed_index=0\n"
+            "train_seed=42\n"
+            "eval_seed=20260719\n"
+            "english_only_mechanism_probe=1\n"
+            "automatic_followup_submitted=0\n"
+        )
         artifact = temporary / "verdict.json"
         training = temporary / "training.json"
         training.write_text('{"verdict":"PASS"}\n')
@@ -359,6 +402,8 @@ def test_receipt_has_closed_verdict_vocabulary_and_no_followup():
         )
         assert "BLOCK_ANCHOR_RECEIPT_FINALIZED" in completed.stdout
         payload = json.loads(receipt.read_text())
+        assert payload["schema"] == "block_anchor_seed0_300proof_receipt_v2"
+        assert "recovery" not in payload
         assert payload["scientific_verdict"] == "INCONCLUSIVE_1K"
         assert payload["generation_status"] == "NEEDS_GENERATION"
         assert payload["automatic_followup_submitted"] is False
@@ -369,6 +414,8 @@ def test_receipt_has_closed_verdict_vocabulary_and_no_followup():
         assert payload["checkpoint_inventories"]["causal"]["file_count"] == 2
         assert payload["environment"]["source_commit"] == "deadbeef"
         assert "automatic_followup_submitted=0" in manifest.read_text()
+        keys = [line.split("=", 1)[0] for line in manifest.read_text().splitlines()]
+        assert len(keys) == len(set(keys))
 
 
 def test_receipt_rejects_verdict_report_mismatch():
