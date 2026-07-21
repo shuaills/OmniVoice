@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail fast unless a config is the plain 300-step correct-case EOS run."""
+"""Fail fast unless a config is an approved plain correct-case EOS run."""
 
 import argparse
 import ast
@@ -9,16 +9,27 @@ from pathlib import Path
 EXPECTED = {
     "audio_vocab_size": 1026,
     "audio_mask_id": 1024,
-    "resume_from_checkpoint": None,
-    "init_from_checkpoint": (
-        "/opt/gpfs/users/shuai/work/block-conversion/pretrained_models/OmniVoice-block"
-    ),
-    "steps": 300,
+    "learning_rate": 0.00003,
+    "lr_scheduler_type": "constant",
+    "warmup_steps": 50,
+    "save_steps": 300,
     "block_training": True,
     "block_size": 32,
     "block_scheme": "dual",
     "eos_decouple_silence": False,
     "split_loss": False,
+}
+ALLOWED_TRAJECTORIES = {
+    (
+        None,
+        "/opt/gpfs/users/shuai/work/block-conversion/pretrained_models/OmniVoice-block",
+        300,
+    ),
+    (
+        "/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721/ce300-v1/train/checkpoint-300",
+        "/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721/ce300-v1/train/checkpoint-300",
+        600,
+    ),
 }
 FORBIDDEN = (
     "generated_prefix",
@@ -54,6 +65,18 @@ def validate(config: dict) -> list[str]:
             failures.append(
                 f"{key} must be {expected!r}, got {config.get(key)!r}"
             )
+    if config.get("force_lr_from_config_on_resume", False) is not False:
+        failures.append("force_lr_from_config_on_resume must remain false")
+    trajectory = (
+        config.get("resume_from_checkpoint"),
+        config.get("init_from_checkpoint"),
+        config.get("steps"),
+    )
+    if trajectory not in ALLOWED_TRAJECTORIES:
+        failures.append(
+            "resume/init checkpoints and steps must identify the approved 0->300 or "
+            f"300->600 trajectory, got {trajectory!r}"
+        )
     present = sorted(
         key for key in config if any(token in key for token in FORBIDDEN)
     )

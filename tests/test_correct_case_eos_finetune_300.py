@@ -5,9 +5,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "examples/config/train_config_correct_case_eos_300.json"
+CONFIG_600 = ROOT / "examples/config/train_config_correct_case_eos_600.json"
 RUNNER = ROOT / "correct_case_eos_finetune_300.sh"
+RUNNER_600 = ROOT / "correct_case_eos_finetune_600.sh"
 EVAL_RUNNER = ROOT / "band_ft10k_eval_pair.sh"
 EVAL_LAUNCHER = ROOT / "correct_case_eos_eval30.sh"
+EVAL_300_VS_600 = ROOT / "correct_case_eos_eval30_300_vs_600.sh"
 CHECKER_PATH = ROOT / "scripts/check_correct_case_eos_config.py"
 SPEC = importlib.util.spec_from_file_location("correct_case_checker", CHECKER_PATH)
 CHECKER = importlib.util.module_from_spec(SPEC)
@@ -60,10 +63,41 @@ def test_checker_rejects_unknown_or_complex_objective_keys():
     config = json.loads(CONFIG.read_text())
     config["generated_prefix_endpoint_training"] = True
     config["misspelled_steps"] = 300
+    config["force_lr_from_config_on_resume"] = True
 
     failures = CHECKER.validate(config)
     assert any("unknown config keys" in failure for failure in failures)
     assert any("forbidden objective keys" in failure for failure in failures)
+    assert any("force_lr_from_config_on_resume" in failure for failure in failures)
+
+
+def test_step_600_config_only_continues_the_plain_objective():
+    config = json.loads(CONFIG_600.read_text())
+
+    assert config["resume_from_checkpoint"] == (
+        "/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721/ce300-v1/train/checkpoint-300"
+    )
+    assert config["init_from_checkpoint"] == (
+        "/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721/ce300-v1/train/checkpoint-300"
+    )
+    assert config["force_lr_from_config_on_resume"] is False
+    assert config["steps"] == 600
+    assert config["save_steps"] == 300
+    assert config["eos_decouple_silence"] is False
+    assert config["split_loss"] is False
+    assert CHECKER.validate(config) == []
+
+
+def test_step_600_runner_restores_full_training_state():
+    source = RUNNER_600.read_text()
+
+    assert source.count("accelerate.commands.accelerate_cli launch") == 1
+    assert "train_config_correct_case_eos_600.json" in source
+    assert "data_config_emilia_full_blockparity.json" in source
+    assert "optimizer.bin scheduler.bin random_states_0.pkl random_states_1.pkl" in source
+    assert "checkpoint-600" in source
+    assert "generated_prefix" not in source
+    assert "teacher" not in source
 
 
 def test_existing_pair_eval_can_run_at_deployment_guidance():
@@ -82,6 +116,16 @@ def test_eval_launcher_compares_base_and_finetune_on_30_cases_per_language():
 
     assert "OmniVoice-block" in source
     assert "ce300-v1/train/checkpoint-300" in source
+    assert "EXPECTED_COUNT=30" in source
+    assert "GUIDANCE_SCALE=1.0" in source
+    assert "band_ft10k_eval_pair.sh" in source
+
+
+def test_continuation_eval_compares_step_300_and_step_600():
+    source = EVAL_300_VS_600.read_text()
+
+    assert "ce300-v1/train/checkpoint-300" in source
+    assert "ce600-v1/train/checkpoint-600" in source
     assert "EXPECTED_COUNT=30" in source
     assert "GUIDANCE_SCALE=1.0" in source
     assert "band_ft10k_eval_pair.sh" in source
