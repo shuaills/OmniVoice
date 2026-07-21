@@ -38,6 +38,8 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 "$RUNTIME_VENV/bin/python" scripts/check_checkpoint_vocab.py \
   --train-config "$TRAIN_CONFIG"
+"$RUNTIME_VENV/bin/python" scripts/check_correct_case_eos_config.py \
+  "$TRAIN_CONFIG"
 
 "$RUNTIME_VENV/bin/python" -m accelerate.commands.accelerate_cli launch \
   --num_processes 2 --num_machines 1 --mixed_precision bf16 --gpu_ids 0,1 \

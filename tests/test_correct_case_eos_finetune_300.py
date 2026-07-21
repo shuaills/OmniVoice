@@ -1,10 +1,16 @@
 import json
+import importlib.util
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "examples/config/train_config_correct_case_eos_300.json"
 RUNNER = ROOT / "correct_case_eos_finetune_300.sh"
+CHECKER_PATH = ROOT / "scripts/check_correct_case_eos_config.py"
+SPEC = importlib.util.spec_from_file_location("correct_case_checker", CHECKER_PATH)
+CHECKER = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(CHECKER)
 
 
 def test_config_is_plain_correct_case_eos_finetune():
@@ -18,8 +24,7 @@ def test_config_is_plain_correct_case_eos_finetune():
     assert config["save_steps"] == 300
     assert config["block_training"] is True
     assert config["block_scheme"] == "dual"
-    assert config["eos_decouple_silence"] is True
-    assert config["eos_band_k"] == 1
+    assert config["eos_decouple_silence"] is False
     assert config["split_loss"] is False
 
     forbidden = (
@@ -31,6 +36,7 @@ def test_config_is_plain_correct_case_eos_finetune():
         "reward",
     )
     assert not any(any(token in key for token in forbidden) for key in config)
+    assert CHECKER.validate(config) == []
 
 
 def test_runner_launches_one_training_job_on_ground_truth_data():
@@ -44,4 +50,15 @@ def test_runner_launches_one_training_job_on_ground_truth_data():
     assert "EXPECTED_COMMIT" in source
     assert "git status --porcelain --untracked-files=all" in source
     assert "scripts/check_checkpoint_vocab.py" in source
+    assert "scripts/check_correct_case_eos_config.py" in source
     assert "checkpoint-300" in source
+
+
+def test_checker_rejects_unknown_or_complex_objective_keys():
+    config = json.loads(CONFIG.read_text())
+    config["generated_prefix_endpoint_training"] = True
+    config["misspelled_steps"] = 300
+
+    failures = CHECKER.validate(config)
+    assert any("unknown config keys" in failure for failure in failures)
+    assert any("forbidden objective keys" in failure for failure in failures)
