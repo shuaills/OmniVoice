@@ -17,7 +17,7 @@ GPU_IDS=${GPU_IDS:-0,1,2}
 STEPS_PER_BLOCK=16
 BLOCK_SIZE=32
 MAX_BLOCKS=24
-GUIDANCE_SCALE=2.0
+GUIDANCE_SCALE=${GUIDANCE_SCALE:-2.0}
 RESULT_ROOT=${RESULT_ROOT:-/opt/gpfs/users/shuai/work/training-contract-probes/results/band-ft10k-first${EXPECTED_COUNT}}
 RUN_ID=${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-${OMS_JOB_ID:-${HOSTNAME:-host}-$$}}
 

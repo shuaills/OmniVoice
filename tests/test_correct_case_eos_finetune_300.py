@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "examples/config/train_config_correct_case_eos_300.json"
 RUNNER = ROOT / "correct_case_eos_finetune_300.sh"
+EVAL_RUNNER = ROOT / "band_ft10k_eval_pair.sh"
 CHECKER_PATH = ROOT / "scripts/check_correct_case_eos_config.py"
 SPEC = importlib.util.spec_from_file_location("correct_case_checker", CHECKER_PATH)
 CHECKER = importlib.util.module_from_spec(SPEC)
@@ -62,3 +63,10 @@ def test_checker_rejects_unknown_or_complex_objective_keys():
     failures = CHECKER.validate(config)
     assert any("unknown config keys" in failure for failure in failures)
     assert any("forbidden objective keys" in failure for failure in failures)
+
+
+def test_existing_pair_eval_can_run_at_deployment_guidance():
+    source = EVAL_RUNNER.read_text()
+
+    assert "GUIDANCE_SCALE=${GUIDANCE_SCALE:-2.0}" in source
+    assert '--guidance-scale "$GUIDANCE_SCALE"' in source
