@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "examples/config/train_config_correct_case_eos_300.json"
 RUNNER = ROOT / "correct_case_eos_finetune_300.sh"
 EVAL_RUNNER = ROOT / "band_ft10k_eval_pair.sh"
+EVAL_LAUNCHER = ROOT / "correct_case_eos_eval30.sh"
 CHECKER_PATH = ROOT / "scripts/check_correct_case_eos_config.py"
 SPEC = importlib.util.spec_from_file_location("correct_case_checker", CHECKER_PATH)
 CHECKER = importlib.util.module_from_spec(SPEC)
@@ -74,3 +75,13 @@ def test_existing_pair_eval_can_run_at_deployment_guidance():
         "    PIDS=()", 1
     )[0]
     assert "--is-baseline" not in validation
+
+
+def test_eval_launcher_compares_base_and_finetune_on_30_cases_per_language():
+    source = EVAL_LAUNCHER.read_text()
+
+    assert "OmniVoice-block" in source
+    assert "ce300-v1/train/checkpoint-300" in source
+    assert "EXPECTED_COUNT=30" in source
+    assert "GUIDANCE_SCALE=1.0" in source
+    assert "band_ft10k_eval_pair.sh" in source
