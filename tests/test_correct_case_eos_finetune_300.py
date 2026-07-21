@@ -11,6 +11,7 @@ RUNNER_600 = ROOT / "correct_case_eos_finetune_600.sh"
 EVAL_RUNNER = ROOT / "band_ft10k_eval_pair.sh"
 EVAL_LAUNCHER = ROOT / "correct_case_eos_eval30.sh"
 EVAL_300_VS_600 = ROOT / "correct_case_eos_eval30_300_vs_600.sh"
+RESUME_MANIFEST = ROOT / "examples/config/ce300_resume_manifest.sha256"
 CHECKER_PATH = ROOT / "scripts/check_correct_case_eos_config.py"
 SPEC = importlib.util.spec_from_file_location("correct_case_checker", CHECKER_PATH)
 CHECKER = importlib.util.module_from_spec(SPEC)
@@ -71,6 +72,25 @@ def test_checker_rejects_unknown_or_complex_objective_keys():
     assert any("force_lr_from_config_on_resume" in failure for failure in failures)
 
 
+def test_checker_rejects_any_training_semantic_drift():
+    config = json.loads(CONFIG_600.read_text())
+    mutations = {
+        "audio_codebook_weights": [1] * 8,
+        "drop_cond_ratio": 0.2,
+        "mask_ratio_range": [0.2, 0.8],
+        "prompt_ratio_range": [0.1, 0.2],
+        "weight_decay": 0.0,
+        "batch_tokens": 1024,
+        "seed": 7,
+        "filter_edge_fillers": True,
+    }
+
+    for key, value in mutations.items():
+        changed = dict(config)
+        changed[key] = value
+        assert CHECKER.validate(changed), key
+
+
 def test_step_600_config_only_continues_the_plain_objective():
     config = json.loads(CONFIG_600.read_text())
 
@@ -95,9 +115,32 @@ def test_step_600_runner_restores_full_training_state():
     assert "train_config_correct_case_eos_600.json" in source
     assert "data_config_emilia_full_blockparity.json" in source
     assert "optimizer.bin scheduler.bin random_states_0.pkl random_states_1.pkl" in source
+    assert "ce300_resume_manifest.sha256" in source
+    assert "sha256sum --check --strict" in source
+    assert "CORRECT_CASE_EOS_FINETUNE_300_PASS" in source
     assert "checkpoint-600" in source
     assert "generated_prefix" not in source
     assert "teacher" not in source
+
+    entries = {
+        filename: digest
+        for digest, filename in (
+            line.split() for line in RESUME_MANIFEST.read_text().splitlines()
+        )
+    }
+    assert set(entries) == {
+        "model.safetensors",
+        "optimizer.bin",
+        "scheduler.bin",
+        "random_states_0.pkl",
+        "random_states_1.pkl",
+        "config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "train_config.json",
+        "chat_template.jinja",
+    }
+    assert all(len(digest) == 64 for digest in entries.values())
 
 
 def test_existing_pair_eval_can_run_at_deployment_guidance():

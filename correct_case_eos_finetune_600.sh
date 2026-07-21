@@ -8,29 +8,20 @@ RUNTIME_VENV=${RUNTIME_VENV:-/opt/gpfs/users/yinfeng/work/OmniVoice/.venv}
 OUTPUT_ROOT=${OUTPUT_ROOT:-/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721}
 RUN_ID=${RUN_ID:-ce600-v1}
 RESUME_CHECKPOINT=/opt/gpfs/users/shuai/experiments/eos-correct-case-20260721/ce300-v1/train/checkpoint-300
-EXPECTED_RESUME_MODEL_SHA256=7c22969c3b92675bb1bf5155c47a0eac6616ccd8c28273fa04b00afae910e2a9
+RESUME_MANIFEST=$ROOT/examples/config/ce300_resume_manifest.sha256
 TRAIN_CONFIG=$ROOT/examples/config/train_config_correct_case_eos_600.json
 DATA_CONFIG=$ROOT/examples/config/data_config_emilia_full_blockparity.json
 RUN_ROOT=$OUTPUT_ROOT/$RUN_ID
 
 [[ -x $RUNTIME_VENV/bin/python ]] || { echo "missing runtime: $RUNTIME_VENV" >&2; exit 2; }
 [[ -d $RESUME_CHECKPOINT ]] || { echo "missing checkpoint: $RESUME_CHECKPOINT" >&2; exit 2; }
-[[ -f ${RESUME_CHECKPOINT%/train/checkpoint-300}/PASS ]] || {
-  echo "missing source PASS marker" >&2
+source_pass=${RESUME_CHECKPOINT%/train/checkpoint-300}/PASS
+[[ -f $source_pass && $(cat "$source_pass") == CORRECT_CASE_EOS_FINETUNE_300_PASS ]] || {
+  echo "invalid source PASS marker" >&2
   exit 2
 }
-for artifact in model.safetensors optimizer.bin scheduler.bin random_states_0.pkl random_states_1.pkl; do
-  [[ -s $RESUME_CHECKPOINT/$artifact ]] || {
-    echo "incomplete resume checkpoint: $RESUME_CHECKPOINT/$artifact" >&2
-    exit 2
-  }
-done
-actual_resume_model_sha256=$(sha256sum "$RESUME_CHECKPOINT/model.safetensors" | awk '{print $1}')
-[[ $actual_resume_model_sha256 == "$EXPECTED_RESUME_MODEL_SHA256" ]] || {
-  echo "wrong resume model hash: expected=$EXPECTED_RESUME_MODEL_SHA256 actual=$actual_resume_model_sha256" >&2
-  exit 2
-}
-[[ -f $TRAIN_CONFIG && -f $DATA_CONFIG ]] || { echo "missing config" >&2; exit 2; }
+[[ -f $RESUME_MANIFEST && -f $TRAIN_CONFIG && -f $DATA_CONFIG ]] || { echo "missing config" >&2; exit 2; }
+(cd "$RESUME_CHECKPOINT" && sha256sum --check --strict "$RESUME_MANIFEST")
 [[ ! -e $RUN_ROOT ]] || { echo "refusing to reuse output: $RUN_ROOT" >&2; exit 2; }
 
 cd "$ROOT"
