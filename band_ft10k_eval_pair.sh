@@ -231,7 +231,7 @@ for ((arm_index = 0; arm_index < ${#ARMS[@]}; arm_index++)); do
       --num-shards 3 --arm "$arm" --lang "$lang" --lang-policy dataset \
       --prompt-contract current --cfg-unconditional-seed-policy shared \
       --guidance-scale "$GUIDANCE_SCALE" --wav-dir "$wav_dir" \
-      --output "$arm_dir/generation_audit.json" --is-baseline | tee -a "$VERDICT"
+      --output "$arm_dir/generation_audit.json" | tee -a "$VERDICT"
 
     PIDS=()
     CUDA_VISIBLE_DEVICES=${GPU_ARRAY[0]} python omnivoice/eval/wer/seedtts.py \

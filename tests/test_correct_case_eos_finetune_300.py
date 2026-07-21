@@ -70,3 +70,7 @@ def test_existing_pair_eval_can_run_at_deployment_guidance():
 
     assert "GUIDANCE_SCALE=${GUIDANCE_SCALE:-2.0}" in source
     assert '--guidance-scale "$GUIDANCE_SCALE"' in source
+    validation = source.split('python "$REPORTER" validate-generation', 1)[1].split(
+        "    PIDS=()", 1
+    )[0]
+    assert "--is-baseline" not in validation
